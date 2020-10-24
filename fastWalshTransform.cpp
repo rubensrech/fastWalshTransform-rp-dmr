@@ -41,6 +41,7 @@
 #include <cuda_runtime_api.h>
 #include <cublas_v2.h>
 #include <time.h>
+#include <sys/time.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // CPU FWT
@@ -131,6 +132,19 @@ const int KERNEL_SIZE = kernelN * sizeof(double);
 const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 
 ////////////////////////////////////////////////////////////////////////////////
+// Timing functions
+////////////////////////////////////////////////////////////////////////////////
+typedef struct timeval Time;
+
+void getTimeNow(Time *t) {
+    gettimeofday(t, 0);
+}
+
+double elapsedTime(Time t1, Time t2) {
+    return (1000000.0*(t2.tv_sec-t1.tv_sec) + t2.tv_usec-t1.tv_usec)/1000.0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
@@ -144,6 +158,8 @@ int main(int argc, char *argv[]) {
 
     double delta, ref, sum_delta2, sum_ref2, L2norm;
     int i;
+
+    Time t1, t2, t3;
 
     printf("1) Initializing data...\n");
     printf("    1.1) Allocating CPU memory\n");
@@ -191,11 +207,16 @@ int main(int argc, char *argv[]) {
     printf("2) Running GPU dyadic convolution using Fast Walsh Transform\n");
     cudaThreadSynchronize();
     // Running FP64
+    getTimeNow(&t1);
+
     fwtBatchGPU(d_Data, 1, log2Data);
     fwtBatchGPU(d_Kernel, 1, log2Data);
     modulateGPU(d_Data, d_Kernel, dataN);
     fwtBatchGPU(d_Data, 1, log2Data);
-    cudaThreadSynchronize();
+    //cudaThreadSynchronize();
+
+    //  getTimeNow(&t2);
+    //  printf("    FP64 execution: %lf ms\n", elapsedTime(t1, t2));
 
     // Running FP32
     fwtBatchGPU(d_Data_rp, 1, log2Data);
@@ -203,6 +224,9 @@ int main(int argc, char *argv[]) {
     modulateGPU(d_Data_rp, d_Kernel_rp, dataN);
     fwtBatchGPU(d_Data_rp, 1, log2Data);
     cudaThreadSynchronize();
+
+    getTimeNow(&t3);
+    printf("    FP64 + FP32 execution: %lf ms\n", elapsedTime(t1, t3));
 
     printf("    2.1) Reading back GPU results\n");
     cudaMemcpy(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost);
