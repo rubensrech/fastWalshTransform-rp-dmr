@@ -36,18 +36,7 @@
 #ifndef FWT_KERNEL_CU
 #define FWT_KERNEL_CU
 
-#include <stdio.h>
-#include <cuda.h>
-#include <cuda_runtime_api.h>
-#include <cublas_v2.h>
-
-#define CHECK_CUDA_ERROR(ans) { checkCudaError((ans), __FILE__, __LINE__); }
-inline void checkCudaError(cudaError_t code, const char *file, int line, bool abort=false) {
-    if (code != cudaSuccess) {
-        printf("CUDA Error: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort) exit(code);
-    }
-}
+#include "util.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Elementary(for vectors less than elementary size) in-shared memory 
@@ -203,24 +192,24 @@ __global__ void fwtBatch2Kernel(real_t *d_Output, real_t *d_Input, int stride) {
 // Put everything together: batched Fast Walsh Transform CPU front-end
 ////////////////////////////////////////////////////////////////////////////////
 template<typename real_t>
-void fwtBatchGPUTemplate(real_t *d_Data, int M, int log2N) {
+void fwtBatchGPUTemplate(real_t *d_Data, int M, int log2N, cudaStream_t stream) {
     int N = 1 << log2N;
     dim3 grid((1 << log2N) / 1024, M, 1);
     for(; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2){
-        fwtBatch2Kernel<<<grid, 256>>>(d_Data, d_Data, N / 4);
+        fwtBatch2Kernel<<<grid, 256, 0, stream>>>(d_Data, d_Data, N / 4);
         CHECK_CUDA_ERROR(cudaPeekAtLastError());
     }
 
-    fwtBatch1Kernel<<<M, N / 4, N * sizeof(real_t)>>>(d_Data, d_Data, log2N);
+    fwtBatch1Kernel<<<M, N / 4, N * sizeof(real_t), stream>>>(d_Data, d_Data, log2N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
 
-void fwtBatchGPU(double *d_Data, int M, int log2N) {
-    fwtBatchGPUTemplate(d_Data, M, log2N);
+void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream) {
+    fwtBatchGPUTemplate(d_Data, M, log2N, stream);
 }
 
-void fwtBatchGPU(float *d_Data, int M, int log2N) {
-    fwtBatchGPUTemplate(d_Data, M, log2N);
+void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream) {
+    fwtBatchGPUTemplate(d_Data, M, log2N, stream);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -237,12 +226,12 @@ __global__ void modulateKernel(real_t *d_A, real_t *d_B, int N){
 }
 
 // Interface to modulateKernel()
-void modulateGPU(double *d_A, double *d_B, int N) {
-    modulateKernel<<<128, 256>>>(d_A, d_B, N);
+void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream) {
+    modulateKernel<<<128, 256, 0, stream>>>(d_A, d_B, N);
 }
 
-void modulateGPU(float *d_A, float *d_B, int N) {
-    modulateKernel<<<128, 256>>>(d_A, d_B, N);
+void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream) {
+    modulateKernel<<<128, 256, 0, stream>>>(d_A, d_B, N);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
