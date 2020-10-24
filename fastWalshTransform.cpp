@@ -155,9 +155,8 @@ int main(int argc, char *argv[]) {
     double *d_Data, *d_Kernel;
     float *d_Data_rp, *d_Kernel_rp;
     float *d_Error;
-    cudaStream_t stream1, stream2;
+    cudaStream_t stream1;
     cudaEvent_t startStream1, stopStream1;
-    cudaEvent_t startStream2, stopStream2;
 
     double delta, ref, sum_delta2, sum_ref2, L2norm;
     Time t1, t2;
@@ -169,8 +168,6 @@ int main(int argc, char *argv[]) {
 
     cudaEventCreate(&startStream1);
     cudaEventCreate(&stopStream1);
-    cudaEventCreate(&startStream2);
-    cudaEventCreate(&stopStream2);
 
     // ====================================================
     printf("    1.1) Allocating CPU memory... ");
@@ -197,7 +194,6 @@ int main(int argc, char *argv[]) {
     getTimeNow(&t1);
 
     CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&stream1, cudaStreamNonBlocking));
-    CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&stream2, cudaStreamNonBlocking));
     // Full-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel, DATA_SIZE));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data,   DATA_SIZE));
@@ -236,46 +232,37 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
     // Reduced-precision
-    CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel_rp, 0, DATA_SIZE_RP, stream2));
-    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel_rp, h_Kernel_rp, KERNEL_SIZE_RP, cudaMemcpyHostToDevice, stream2));
-    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data_rp, h_Data_rp, DATA_SIZE_RP, cudaMemcpyHostToDevice, stream2));
+    CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel_rp, 0, DATA_SIZE_RP, stream1));
+    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel_rp, h_Kernel_rp, KERNEL_SIZE_RP, cudaMemcpyHostToDevice, stream1));
+    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data_rp, h_Data_rp, DATA_SIZE_RP, cudaMemcpyHostToDevice, stream1));
 
     cudaStreamSynchronize(stream1);
-    cudaStreamSynchronize(stream2);
     cudaDeviceSynchronize();
     getTimeNow(&t2);
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
 
     // ====================================================
-    printf("2) Running dyadic convolution using Fast Walsh Transform on device...\n");
-    getTimeNow(&t1);
-
-    // Full-precision
+    printf("2) Running dyadic convolution using Fast Walsh Transform on device... ");
     cudaEventRecord(startStream1, stream1);
+    
+    // Full-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
     fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
     modulateGPU(d_Data, d_Kernel, dataN, stream1);
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
+    // Reduced-precision
+    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
+    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
+    modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
+    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
+
     cudaEventRecord(stopStream1, stream1);
     cudaEventSynchronize(stopStream1);
-    // Reduced-precision
-    cudaEventRecord(startStream2, stream2);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream2);
-    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream2);
-    modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream2);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream2);
-    cudaEventRecord(stopStream2, stream2);
-    cudaEventSynchronize(stopStream2);
 
-    float msStream1 = 0, msStream2 = 0;
+    float msStream1 = 0;
     cudaEventElapsedTime(&msStream1, startStream1, stopStream1);
-    cudaEventElapsedTime(&msStream2, startStream2, stopStream2);
-    printf("    > Double stream: %3.3lf ms\n", msStream1);
-    printf("    > Float stream: %3.3lf ms\n", msStream2);
-
-    getTimeNow(&t2);
-    printf("    > Total: %3.3lf ms\n", elapsedTime(t1, t2));
+    printf("(%3.3lf ms) \n", msStream1);
     
     // ====================================================
     printf("    2.1) Reading back device results... ");
@@ -284,10 +271,9 @@ int main(int argc, char *argv[]) {
     // Full-precision
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
     // Reduced-precision
-    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream2);
+    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
 
     cudaStreamSynchronize(stream1);
-    cudaStreamSynchronize(stream2);
 
     getTimeNow(&t2);
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
