@@ -104,8 +104,9 @@ void dyadicConvolutionCPU(double *h_Result, double *h_Data, double *h_Kernel, in
 ////////////////////////////////////////////////////////////////////////////////
 // GPU FWT
 ////////////////////////////////////////////////////////////////////////////////
-extern void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream);
-extern void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream);
+extern void fwtBatchGPU(double *d_Out, double *d_Data, int M, int log2N, cudaStream_t stream);
+extern void fwtBatchGPU(float *d_Out, double *d_Data, int M, int log2N, cudaStream_t stream);
+extern void fwtBatchGPU(float *d_Out, float *d_Data, int M, int log2N, cudaStream_t stream);
 extern void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream);
 extern void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream);
 
@@ -147,13 +148,20 @@ double elapsedTime(Time t1, Time t2) {
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
     // Host data
+    // Full-precision
     double *h_Data, *h_Kernel, *h_ResultCPU, *h_ResultGPU;
-    float *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
+    // Reduced-precision
+    float *h_ResultGPU_rp;
+
     float *h_Error;
 
     // Device data
-    double *d_Data, *d_Kernel;
-    float *d_Data_rp, *d_Kernel_rp;
+    // Full-precision
+    double *d_Data, *d_Kernel, 
+            *d_Out_Data, *d_Out_Kernel;
+    // Reduced-precision
+    float *d_Out_Data_rp, *d_Out_Kernel_rp;
+
     float *d_Error;
     cudaStream_t stream1;
     cudaEvent_t startStream1, stopStream1;
@@ -179,8 +187,6 @@ int main(int argc, char *argv[]) {
     h_ResultCPU = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
     // Reduced-precision
-    h_Kernel_rp    = (float*)malloc(KERNEL_SIZE_RP);
-    h_Data_rp      = (float*)malloc(DATA_SIZE_RP);
     h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
     // Error calculation
     h_Error = (float*)malloc(DATA_SIZE_RP);
@@ -195,13 +201,15 @@ int main(int argc, char *argv[]) {
 
     CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&stream1, cudaStreamNonBlocking));
     // Full-precision
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel, DATA_SIZE));
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data,   DATA_SIZE));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel,     DATA_SIZE));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Out_Kernel, DATA_SIZE));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data,       DATA_SIZE));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Out_Data,   DATA_SIZE));
     // Reduced-precision
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel_rp, DATA_SIZE_RP));
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data_rp,   DATA_SIZE_RP));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Out_Kernel_rp, DATA_SIZE_RP));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Out_Data_rp,   DATA_SIZE_RP));
     // Error calculation
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Error,   DATA_SIZE_RP));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Error, DATA_SIZE_RP));
 
     getTimeNow(&t2);
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
@@ -213,11 +221,9 @@ int main(int argc, char *argv[]) {
     srand((int)time(NULL));
     for (i = 0; i < kernelN; i++) {
         h_Kernel[i] = (double)rand() / (double)RAND_MAX;
-        h_Kernel_rp[i] = h_Kernel[i];
     }
     for (i = 0; i < dataN; i++) {
         h_Data[i] = (double)rand() / (double)RAND_MAX;
-        h_Data_rp[i] = h_Data[i];
     }
 
     getTimeNow(&t2);
@@ -229,12 +235,12 @@ int main(int argc, char *argv[]) {
 
     // Full-precision    
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
+    CHECK_CUDA_ERROR(cudaMemsetAsync(d_Out_Kernel, 0, DATA_SIZE, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
+    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Out_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
+    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Out_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
     // Reduced-precision
-    CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel_rp, 0, DATA_SIZE_RP, stream1));
-    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel_rp, h_Kernel_rp, KERNEL_SIZE_RP, cudaMemcpyHostToDevice, stream1));
-    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data_rp, h_Data_rp, DATA_SIZE_RP, cudaMemcpyHostToDevice, stream1));
 
     cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
@@ -245,17 +251,17 @@ int main(int argc, char *argv[]) {
     // ====================================================
     printf("2) Running dyadic convolution using Fast Walsh Transform on device... ");
     cudaEventRecord(startStream1, stream1);
-    
+
     // Full-precision
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
-    modulateGPU(d_Data, d_Kernel, dataN, stream1);
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
+    fwtBatchGPU(d_Out_Data, d_Data, 1, log2Data, stream1);              // double <- double
+    fwtBatchGPU(d_Out_Kernel, d_Kernel, 1, log2Data, stream1);          // double <- double
+    modulateGPU(d_Out_Data, d_Out_Kernel, dataN, stream1);              // double <- double
+    fwtBatchGPU(d_Out_Data, d_Out_Data, 1, log2Data, stream1);          // double <- double
     // Reduced-precision
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
-    modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
+    fwtBatchGPU(d_Out_Data_rp, d_Data, 1, log2Data, stream1);           // float <- double
+    fwtBatchGPU(d_Out_Kernel_rp, d_Kernel, 1, log2Data, stream1);       // float <- double
+    modulateGPU(d_Out_Data_rp, d_Out_Kernel_rp, dataN, stream1);        // float <- float
+    fwtBatchGPU(d_Out_Data_rp, d_Out_Data_rp, 1, log2Data, stream1);    // float <- float
 
     cudaEventRecord(stopStream1, stream1);
     cudaEventSynchronize(stopStream1);
@@ -269,9 +275,9 @@ int main(int argc, char *argv[]) {
     getTimeNow(&t1);
 
     // Full-precision
-    cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
+    cudaMemcpyAsync(h_ResultGPU, d_Out_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
     // Reduced-precision
-    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
+    cudaMemcpyAsync(h_ResultGPU_rp, d_Out_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
 
     cudaStreamSynchronize(stream1);
 
@@ -312,7 +318,7 @@ int main(int argc, char *argv[]) {
     getTimeNow(&t1);
 
     // Relative error
-    relative_error_gpu(d_Data, d_Data_rp, d_Error, dataN);
+    relative_error_gpu(d_Out_Data, d_Out_Data_rp, d_Error, dataN);
     cudaMemcpy(h_Error, d_Error, DATA_SIZE_RP, cudaMemcpyDeviceToHost);    
     int iMaxRelErr = 0;
     for (i = 0; i < dataN; i++) if (h_Error[i] > h_Error[iMaxRelErr]) iMaxRelErr = i;
@@ -336,13 +342,13 @@ int main(int argc, char *argv[]) {
     free(h_Data);
     free(h_Kernel);
     CHECK_CUDA_ERROR(cudaFree(d_Data));
+    CHECK_CUDA_ERROR(cudaFree(d_Out_Data));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel));
+    CHECK_CUDA_ERROR(cudaFree(d_Out_Kernel));
     // Reduced-precision
     free(h_ResultGPU_rp);
-    free(h_Data_rp);
-    free(h_Kernel_rp);
-    CHECK_CUDA_ERROR(cudaFree(d_Data_rp));
-    CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
+    CHECK_CUDA_ERROR(cudaFree(d_Out_Data_rp));
+    CHECK_CUDA_ERROR(cudaFree(d_Out_Kernel_rp));
     // Error calculation
     CHECK_CUDA_ERROR(cudaFree(d_Error));
 }
