@@ -173,12 +173,13 @@ __global__ void fwtBatch1Kernel(float *d_Output, float *d_Input, int log2N) {
 // Single in-global memory radix-4 Fast Walsh Transform pass
 // (for strides exceeding elementary vector size)
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void fwtBatch2Kernel(double *d_Output, double *d_Input, int stride) {
+template<typename real_t>
+__global__ void fwtBatch2Kernel(real_t *d_Output, real_t *d_Input, int stride) {
     const int pos = blockIdx.x * blockDim.x + threadIdx.x;
     const int   N = blockDim.x *  gridDim.x * 4;
 
-    double *d_Src = d_Input  + blockIdx.y * N;
-    double *d_Dst = d_Output + blockIdx.y * N;
+    real_t *d_Src = d_Input  + blockIdx.y * N;
+    real_t *d_Dst = d_Output + blockIdx.y * N;
 
     int lo = pos & (stride - 1);
     int i0 = ((pos - lo) << 2) + lo;
@@ -186,48 +187,23 @@ __global__ void fwtBatch2Kernel(double *d_Output, double *d_Input, int stride) {
     int i2 = i1 + stride;
     int i3 = i2 + stride;
 
-    double d0 = d_Src[i0];
-    double d1 = d_Src[i1];
-    double d2 = d_Src[i2];
-    double d3 = d_Src[i3];
+    real_t d0 = d_Src[i0];
+    real_t d1 = d_Src[i1];
+    real_t d2 = d_Src[i2];
+    real_t d3 = d_Src[i3];
 
-    double t;
+    real_t t;
     t = d0; d0        = d0 + d2; d2        = t - d2;
     t = d1; d1        = d1 + d3; d3        = t - d3;
     t = d0; d_Dst[i0] = d0 + d1; d_Dst[i1] = t - d1;
     t = d2; d_Dst[i2] = d2 + d3; d_Dst[i3] = t - d3;
 }
-
-__global__ void fwtBatch2Kernel(float *d_Output, float *d_Input, int stride) {
-    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
-    const int   N = blockDim.x *  gridDim.x * 4;
-
-    float *d_Src = d_Input  + blockIdx.y * N;
-    float *d_Dst = d_Output + blockIdx.y * N;
-
-    int lo = pos & (stride - 1);
-    int i0 = ((pos - lo) << 2) + lo;
-    int i1 = i0 + stride;
-    int i2 = i1 + stride;
-    int i3 = i2 + stride;
-
-    float d0 = d_Src[i0];
-    float d1 = d_Src[i1];
-    float d2 = d_Src[i2];
-    float d3 = d_Src[i3];
-
-    float t;
-    t = d0; d0        = d0 + d2; d2        = t - d2;
-    t = d1; d1        = d1 + d3; d3        = t - d3;
-    t = d0; d_Dst[i0] = d0 + d1; d_Dst[i1] = t - d1;
-    t = d2; d_Dst[i2] = d2 + d3; d_Dst[i3] = t - d3;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Put everything together: batched Fast Walsh Transform CPU front-end
 ////////////////////////////////////////////////////////////////////////////////
-void fwtBatchGPU(double *d_Data, int M, int log2N) {
+template<typename real_t>
+void fwtBatchGPUTemplate(real_t *d_Data, int M, int log2N) {
     int N = 1 << log2N;
     dim3 grid((1 << log2N) / 1024, M, 1);
     for(; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2){
@@ -235,44 +211,32 @@ void fwtBatchGPU(double *d_Data, int M, int log2N) {
         CHECK_CUDA_ERROR(cudaPeekAtLastError());
     }
 
-    fwtBatch1Kernel<<<M, N / 4, N * sizeof(double)>>>(d_Data, d_Data, log2N);
+    fwtBatch1Kernel<<<M, N / 4, N * sizeof(real_t)>>>(d_Data, d_Data, log2N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
 
-void fwtBatchGPU(float *d_Data, int M, int log2N) {
-    int N = 1 << log2N;
-    dim3 grid((1 << log2N) / 1024, M, 1);
-    for(; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2){
-        fwtBatch2Kernel<<<grid, 256>>>(d_Data, d_Data, N / 4);
-        CHECK_CUDA_ERROR(cudaPeekAtLastError());
-    }
+void fwtBatchGPU(double *d_Data, int M, int log2N) {
+    fwtBatchGPUTemplate(d_Data, M, log2N);
+}
 
-    fwtBatch1Kernel<<<M, N / 4, N * sizeof(float)>>>(d_Data, d_Data, log2N);
-    CHECK_CUDA_ERROR(cudaPeekAtLastError());
+void fwtBatchGPU(float *d_Data, int M, int log2N) {
+    fwtBatchGPUTemplate(d_Data, M, log2N);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Modulate two arrays
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void modulateKernel(double *d_A, double *d_B, int N){
+template<typename real_t>
+__global__ void modulateKernel(real_t *d_A, real_t *d_B, int N){
     int        tid = blockIdx.x * blockDim.x + threadIdx.x;
     int numThreads = blockDim.x * gridDim.x;
-    double     rcpN = 1.0f / (double)N;
+    real_t     rcpN = 1.0f / (real_t)N;
 
-    for(int pos = tid; pos < N; pos += numThreads)
+    for (int pos = tid; pos < N; pos += numThreads)
         d_A[pos] *= d_B[pos] * rcpN;
 }
 
-__global__ void modulateKernel(float *d_A, float *d_B, int N){
-    int        tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int numThreads = blockDim.x * gridDim.x;
-    float     rcpN = 1.0f / (float)N;
-
-    for(int pos = tid; pos < N; pos += numThreads)
-        d_A[pos] *= d_B[pos] * rcpN;
-}
-
-//Interface to modulateKernel()
+// Interface to modulateKernel()
 void modulateGPU(double *d_A, double *d_B, int N) {
     modulateKernel<<<128, 256>>>(d_A, d_B, N);
 }
