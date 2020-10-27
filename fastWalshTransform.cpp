@@ -107,7 +107,10 @@ void dyadicConvolutionCPU(double *h_Result, double *h_Data, double *h_Kernel, in
 extern void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N, cudaStream_t stream);
 extern void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N, cudaStream_t stream);
 
-extern void relative_error_gpu(double *output, float *output_rp, float *err_output, int N);
+extern void check_relative_error_gpu(double *array, float *array_rp, int N);
+extern void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
+extern unsigned long long get_dmr_error();
+
 extern void copyGPU(float *array_rp, double *array, int N);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -232,10 +235,7 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
-    // Reduced-precision
-    copyGPU(d_Data_rp, d_Data, dataN);
-    copyGPU(d_Kernel_rp, d_Kernel, dataN);
-
+    
     CHECK_CUDA_ERROR(cudaStreamSynchronize(stream1));
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());
     getTimeNow(&t2);
@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
     sum_delta2 = 0;
     sum_ref2   = 0;
     for (i = 0; i < dataN; i++) {
-        delta       = h_ResultCPU[i] - h_ResultGPU[i];
+        delta       = h_ResultCPU[i] - h_ResultGPU_rp[i];
         ref         = h_ResultCPU[i];
         sum_delta2 += delta * delta;
         sum_ref2   += ref * ref;
@@ -307,21 +307,23 @@ int main(int argc, char *argv[]) {
     getTimeNow(&t1);
 
     // Relative error
-    relative_error_gpu(d_Data, d_Data_rp, d_Error, dataN);
+    calc_relative_error_gpu(d_Data, d_Data_rp, d_Error, dataN);
     cudaMemcpy(h_Error, d_Error, DATA_SIZE_RP, cudaMemcpyDeviceToHost);    
     int iMaxRelErr = 0;
-    for (i = 0; i < dataN; i++) if (h_Error[i] > h_Error[iMaxRelErr]) iMaxRelErr = i;
+    float maxRelErr = h_Error[0];
+    for (i = 0; i < dataN; i++) if (h_Error[i] > maxRelErr) { iMaxRelErr = i; maxRelErr = h_Error[i]; }
     // Absolute error
     for (i = 0; i < dataN; i++) h_Error[i] = abs(h_ResultGPU[i] - h_ResultGPU_rp[i]);
+    float maxAbsErr = h_Error[0];
     int iMaxAbsErr = 0;
-    for (i = 0; i < dataN; i++) if (h_Error[i] > h_Error[iMaxAbsErr]) iMaxAbsErr = i;
+    for (i = 0; i < dataN; i++) if (h_Error[i] > maxAbsErr) { iMaxAbsErr = i; maxAbsErr = h_Error[i]; }
     
-
     getTimeNow(&t2);
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
-    printf("    Max relative error: %f (%f x %f)\n", h_Error[iMaxRelErr], h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
-    printf("    Max absolute error: %f (%f x %f)\n", h_Error[iMaxAbsErr], h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+    printf("    Max relative error: %f (%f x %f)\n", maxRelErr, h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
+    printf("    Max absolute error: %f (%f x %f)\n", maxAbsErr, h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+    printf("    DMR errors: %llu\n", get_dmr_error());
 
     // ====================================================
     printf("6) Shutting down\n");
