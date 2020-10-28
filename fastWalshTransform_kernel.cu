@@ -45,8 +45,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 #define ELEMENTARY_LOG2SIZE 11
 
-int iErr = 0;
-
 __global__ void fwtBatch1Kernel(double *d_Output, float *d_Output_rp, double *d_Input, int log2N) {
     const int N = 1 << log2N;
     int stride = N;
@@ -161,18 +159,14 @@ void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N, float *h_
         CHECK_CUDA_ERROR(cudaPeekAtLastError());
         check_relative_error_gpu(d_Data, d_Output_rp, N);
         
-        calc_relative_error_gpu(d_Data, d_Output_rp, d_err, N);
-        cudaMemcpy(h_err, d_err, N * sizeof(float), cudaMemcpyDeviceToHost);
-        max_errs.push_back(find_max(h_err, N));
+        max_errs.push_back(find_max_relative_error_gpu(d_Data, d_Output_rp, N, h_err, d_err));
     }
 
     fwtBatch1Kernel<<<M, N / 4, N * sizeof(double) + N * sizeof(float)>>>(d_Data, d_Output_rp, d_Data, log2N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
     check_relative_error_gpu(d_Data, d_Output_rp, N);
 
-    calc_relative_error_gpu(d_Data, d_Output_rp, d_err, N);
-    cudaMemcpy(h_err, d_err, N * sizeof(float), cudaMemcpyDeviceToHost);
-    max_errs[iErr++] = find_max(h_err, N);
+    max_errs.push_back(find_max_relative_error_gpu(d_Data, d_Output_rp, N, h_err, d_err));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -193,9 +187,7 @@ void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N, float *h_err, f
     modulateKernel<<<128, 256>>>(d_A, d_A_rp, d_B, N);
     check_relative_error_gpu(d_A, d_A_rp, N);
 
-    calc_relative_error_gpu(d_A, d_A_rp, d_err, N);
-    cudaMemcpy(h_err, d_err, N * sizeof(float), cudaMemcpyDeviceToHost);
-    max_errs.push_back(find_max(h_err, N));
+    max_errs.push_back(find_max_relative_error_gpu(d_A, d_A_rp, N, h_err, d_err));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

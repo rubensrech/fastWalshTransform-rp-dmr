@@ -320,10 +320,12 @@ int main(int argc, char *argv[]) {
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
     float maxErr = find_max(&h_maxRelErrs[0], h_maxRelErrs.size());
-    printf("    Max error among all iterations: %f\n", maxErr);
+    printf("    Max relative errors (%d iterations): %1.2f", int(h_maxRelErrs.size()), h_maxRelErrs[0]);
+    for (i = 1; i < h_maxRelErrs.size(); i++) printf(", %1.2f", h_maxRelErrs[i]);
+    printf(" (max: %1.3f)\n", maxErr);
     
-    printf("    Max relative error: %f (%f x %f)\n", maxRelErr, h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
-    printf("    Max absolute error: %f (%f x %f)\n", maxAbsErr, h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+    printf("    Output max relative error: %f (%f x %f)\n", maxRelErr, h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
+    printf("    Output max absolute error: %f (%f x %f)\n", maxAbsErr, h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
     printf("    DMR errors: %llu\n", get_dmr_error());
 
     // ====================================================

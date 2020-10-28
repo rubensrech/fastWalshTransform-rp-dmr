@@ -44,3 +44,6 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(H_FILES)
 clean:
 	rm -rf $(OBJ_DIR)
 	rm $(TARGET)
+
+copy_titanV:
+	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr

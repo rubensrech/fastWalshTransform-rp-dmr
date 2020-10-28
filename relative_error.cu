@@ -47,3 +47,11 @@ void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int
     calc_relative_error_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, err_out, N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
+
+// > Max relative error
+
+float find_max_relative_error_gpu(double *d_array, float *d_array_rp, int N, float *h_err, float *d_err) {
+    calc_relative_error_gpu(d_array, d_array_rp, d_err, N);
+    cudaMemcpy(h_err, d_err, N * sizeof(float), cudaMemcpyDeviceToHost);
+    return find_max(h_err, N);
+}
