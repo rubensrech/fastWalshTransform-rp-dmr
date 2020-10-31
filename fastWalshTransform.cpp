@@ -148,6 +148,15 @@ double elapsedTime(Time t1, Time t2) {
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
+
+    // ===== Arguments =====
+    // > Load Input
+    char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
+    bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
+
+    // > Save output
+    bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
+
     // Host data
     // Full-precision
     double *h_Data, *h_Kernel, *h_ResultCPU, *h_ResultGPU;
@@ -212,20 +221,35 @@ int main(int argc, char *argv[]) {
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
     // ====================================================
-    printf("    1.3) Generating data (host)... ");
-    getTimeNow(&t1);
+    if (loadInput) {
+        printf("    1.3) Loading input data...");
+        getTimeNow(&t1);
 
-    srand((int)time(NULL));
-    for (i = 0; i < kernelN; i++) {
-        h_Kernel[i] = (double)rand() / (double)RAND_MAX;
+        int dN = 0, kN = 0;
+        load_input(input_filename, h_Data, &dN, h_Kernel, &kN);
+
+        getTimeNow(&t2);
+        printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
+
+        if (dN != dataN || kN != kernelN) {
+            printf("ERROR: Input data doesn't match the expected size\n");
+            exit(-1);
+        }
+    } else {
+        printf("    1.3) Generating data... ");
+        getTimeNow(&t1);
+
+        srand((int)time(NULL));
+        for (i = 0; i < kernelN; i++) {
+            h_Kernel[i] = (double)rand() / (double)RAND_MAX;
+        }
+        for (i = 0; i < dataN; i++) {
+            h_Data[i] = (double)rand() / (double)RAND_MAX;
+        }
+
+        getTimeNow(&t2);
+        printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
     }
-    for (i = 0; i < dataN; i++) {
-        h_Data[i] = (double)rand() / (double)RAND_MAX;
-    }
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
     // ====================================================
     printf("    1.4) Copying data to device... ");
     getTimeNow(&t1);
@@ -330,10 +354,18 @@ int main(int argc, char *argv[]) {
 
 
     // ====================================================
-    if (maxErr < 1.25) {
+    if (maxErr < 1.25 && !loadInput) {
         printf("\nSaving input... ");
-        bool savedSuccess = save_input(h_Data, dataN, h_Kernel, kernelN, maxErr);
-        printf(savedSuccess ? "SAVED\n" : "FAILED\n");
+        bool inputSaved = save_input(h_Data, dataN, h_Kernel, kernelN, maxErr);
+        printf(inputSaved ? "SAVED" : "FAILED");
+        printf("\n\n");
+    }
+
+    if (saveOutput) {
+        printf("\nSaving output... ");
+        bool outputSaved = save_output(h_ResultGPU, dataN, maxErr);
+        printf(outputSaved ? "SAVED" : "FAILED");
+        printf("\n\n");
     }
 
     // ====================================================

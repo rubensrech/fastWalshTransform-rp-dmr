@@ -19,7 +19,11 @@ inline void checkCudaError(cudaError_t code, const char *file, int line, bool ab
     }
 }
 
+int find_int_arg(int argc, char **argv, char *arg, int def);
+char *find_char_arg(int argc, char **argv, char *arg, char *def);
 float find_max(float *array, int N);
 bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxErr);
+bool load_input(char *filename, double *data, int *dataN, double *kernel, int *kernelN);
+bool save_output(double *output, int N, float maxErr);
 
 #endif
