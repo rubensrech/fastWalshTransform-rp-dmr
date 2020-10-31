@@ -272,13 +272,13 @@ int main(int argc, char *argv[]) {
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
     // ====================================================
-    printf("3) Running straightforard CPU dyadic convolution... ");
-    getTimeNow(&t1);
+    // printf("3) Running straightforard CPU dyadic convolution... ");
+    // getTimeNow(&t1);
 
-    dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
+    // dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
 
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
+    // getTimeNow(&t2);
+    // printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
     // ====================================================
     printf("4) Comparing the results... ");
@@ -327,6 +327,14 @@ int main(int argc, char *argv[]) {
     printf("    Output max relative error: %f (%f x %f)\n", maxRelErr, h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
     printf("    Output max absolute error: %f (%f x %f)\n", maxAbsErr, h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
     printf("    DMR errors: %llu\n", get_dmr_error());
+
+
+    // ====================================================
+    if (maxErr < 1.25) {
+        printf("\nSaving input... ");
+        bool savedSuccess = save_input(h_Data, dataN, h_Kernel, kernelN, maxErr);
+        printf(savedSuccess ? "SAVED\n" : "FAILED\n");
+    }
 
     // ====================================================
     printf("6) Shutting down\n");

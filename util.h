@@ -20,5 +20,6 @@ inline void checkCudaError(cudaError_t code, const char *file, int line, bool ab
 }
 
 float find_max(float *array, int N);
+bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxErr);
 
 #endif
