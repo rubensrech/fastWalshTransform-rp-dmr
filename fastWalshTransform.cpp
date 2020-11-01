@@ -35,83 +35,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
-#include <time.h>
-#include <sys/time.h>
+#include <regex>
 
 #include "util.h"
-
-////////////////////////////////////////////////////////////////////////////////
-// CPU FWT
-////////////////////////////////////////////////////////////////////////////////
-void fwtCPU(double *h_Output, double *h_Input, int log2N){
-    const int N = 1 << log2N;
-
-    for(int pos = 0; pos < N; pos++)
-        h_Output[pos] = h_Input[pos];
-
-    //Cycle through stages with different butterfly strides
-    for(int stride = N / 2; stride >= 1; stride >>= 1){
-        //Cycle through subvectors of (2 * stride) elements
-        for(int base = 0; base < N; base += 2 * stride)
-            //Butterfly index within subvector of (2 * stride) size
-            for(int j = 0; j < stride; j++){
-                int i0 = base + j +      0;
-                int i1 = base + j + stride;
-
-                double T1 = h_Output[i0];
-                double T2 = h_Output[i1];
-                h_Output[i0] = T1 + T2;
-                h_Output[i1] = T1 - T2;
-            }
-    }
-}
-
-void slowWTcpu(double *h_Output, double *h_Input, int log2N){
-    const int N = 1 << log2N;
-
-    for(int i = 0; i < N; i++){
-        double sum = 0;
-
-        for(int j = 0; j < N; j++){
-            //Walsh-Hadamar quotent
-            double q = 1.0;
-            for(int t = i & j; t != 0; t >>= 1)
-                if(t & 1) q = -q;
-
-            sum += q * h_Input[j];
-        }
-
-        h_Output[i] = (double)sum;
-    }
-}
-
-void dyadicConvolutionCPU(double *h_Result, double *h_Data, double *h_Kernel, int log2dataN, int log2kernelN) {
-    const int   dataN = 1 << log2dataN;
-    const int kernelN = 1 << log2kernelN;
-
-    for(int i = 0; i < dataN; i++){
-        double sum = 0;
-
-        for(int j = 0; j < kernelN; j++)
-            sum += h_Data[i ^ j] * h_Kernel[j];
-
-        h_Result[i] = (double)sum;
-    }
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// GPU FWT
-////////////////////////////////////////////////////////////////////////////////
-extern void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N, float *h_err, float *d_err, std::vector<float> &max_errs);
-extern void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N, float *h_err, float *d_err, std::vector<float> &max_errs);
-
-extern void check_relative_error_gpu(double *array, float *array_rp, int N);
-extern void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
-extern unsigned long long get_dmr_error();
-
-extern void copyGPU(float *array_rp, double *array, int N);
+#include "fwtCPU.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Data configuration
@@ -132,17 +61,18 @@ const int KERNEL_SIZE = kernelN * sizeof(double);
 const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Timing functions
+// GPU FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct timeval Time;
+extern void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N, float *h_err, float *d_err, std::vector<float> &max_errs);
+extern void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N, float *h_err, float *d_err, std::vector<float> &max_errs);
 
-void getTimeNow(Time *t) {
-    gettimeofday(t, 0);
-}
+extern void check_relative_error_gpu(double *array, float *array_rp, int N);
+extern void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
+extern unsigned long long get_dmr_error();
 
-double elapsedTime(Time t1, Time t2) {
-    return (1000000.0*(t2.tv_sec-t1.tv_sec) + t2.tv_usec-t1.tv_usec)/1000.0;
-}
+extern void copyGPU(float *array_rp, double *array, int N);
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
@@ -156,6 +86,8 @@ int main(int argc, char *argv[]) {
     bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
     // * Save output
     bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
+    // * Validate output
+    bool validateOutput = find_int_arg(argc, argv, (char*)"-validateOutput", 0);
 
     // ====================================================
     // > Declaring variables
@@ -177,7 +109,6 @@ int main(int argc, char *argv[]) {
     // Error calculation
     float *d_Error;
 
-    // Time t1, t2;
     int i;
 
     // ====================================================
@@ -210,13 +141,7 @@ int main(int argc, char *argv[]) {
 
     if (loadInput) {
         // > Loading input data
-        int dN = 0, kN = 0;
-        load_input(input_filename, h_Data, &dN, h_Kernel, &kN);
-
-        if (dN != dataN || kN != kernelN) {
-            printf("ERROR: Input data doesn't match the expected size\n");
-            exit(-1);
-        }
+        load_input(input_filename, h_Data, dataN, h_Kernel, kernelN);
     } else {
         // > Generating input data
         srand((int)time(NULL));
@@ -252,6 +177,12 @@ int main(int argc, char *argv[]) {
     cudaMemcpy(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost);
 
     // ====================================================
+    // > Validating output
+    if (validateOutput) {
+        validateGPUOutput(h_Data, h_Kernel, log2Data, log2Kernel, h_ResultGPU);
+    }
+    
+    // ====================================================
     // > Saving output
     if (saveOutput) {
         if (!save_output(h_ResultGPU, dataN)) {
@@ -261,11 +192,16 @@ int main(int argc, char *argv[]) {
 
     // ====================================================
     // > Checking for faults
-    printf("DMR errors: %llu\n", get_dmr_error());
+    unsigned long long dmrErrors = get_dmr_error();
+    bool faultDetected = dmrErrors > 0;
+    printf("DMR errors: %llu\n", dmrErrors);
 
     // ====================================================
     // > Checking output against Golden output
-    // ...
+    std::string gold_output_filename(input_filename);
+    gold_output_filename = std::regex_replace(gold_output_filename, std::regex("input"), "output");
+    bool ouputMatchesGold = compare_output_with_golden(h_ResultGPU, dataN, gold_output_filename.c_str());
+    printf("Output matches Golden: %s\n", ouputMatchesGold ? "YES" : "NO");
 
     // ====================================================
     // > Shutting down
