@@ -1,8 +1,8 @@
 #ifndef RELATIVE_ERROR_H
 #define REALTIVE_ERROR_H
 
-#define MIN_PERCENTAGE 0.99f
-#define MAX_PERCENTAGE 1.01f
+#define MIN_PERCENTAGE 0.82f
+#define MAX_PERCENTAGE 1.18f
 
 void check_relative_error_gpu(double *array, float *array_rp, int N);
 void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);

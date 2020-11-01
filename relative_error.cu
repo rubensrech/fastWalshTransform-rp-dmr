@@ -16,10 +16,10 @@ unsigned long long get_dmr_error() {
 }
 
 __forceinline__  __device__ void relative_error(double val, float val_rp) {
-	float relative = __fdividef(val_rp, float(val));
-	if (relative < MIN_PERCENTAGE || relative > MAX_PERCENTAGE) {
-		atomicAdd(&errors, 1);
-	}
+    float relative = __fdividef(val_rp, float(val));
+    if (val > 0 && (relative < MIN_PERCENTAGE || relative > MAX_PERCENTAGE)) {
+        atomicAdd(&errors, 1);
+    }
 }
 
 __global__ void check_relative_error_kernel(double *array, float *array_rp, int N) {
@@ -38,8 +38,13 @@ void check_relative_error_gpu(double *array, float *array_rp, int N) {
 
 __global__ void calc_relative_error_kernel(double *array, float *array_rp, float *err_out, int N) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < N)
-        err_out[tid] = __fdividef(array_rp[tid], float(array[tid]));
+    if (tid < N) {
+        if (array[tid] > 0) {
+            err_out[tid] = abs(1 - __fdividef(array_rp[tid], float(array[tid])));
+        } else {
+            err_out[tid] = 0;
+        }   
+    }
 }
 
 void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N) {

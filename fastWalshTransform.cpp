@@ -325,40 +325,22 @@ int main(int argc, char *argv[]) {
     printf((L2norm < 1e-6) ? "    TEST PASSED\n" : "    TEST FAILED\n");
 
     // ====================================================
-    printf("5) Comparing Double VS Float... ");
-    getTimeNow(&t1);
-
-    // Relative error
-    calc_relative_error_gpu(d_Data, d_Data_rp, d_Error, dataN);
-    cudaMemcpy(h_Error, d_Error, DATA_SIZE_RP, cudaMemcpyDeviceToHost);    
-    int iMaxRelErr = 0;
-    float maxRelErr = h_Error[0];
-    for (i = 0; i < dataN; i++) if (h_Error[i] > maxRelErr) { iMaxRelErr = i; maxRelErr = h_Error[i]; }
-    // Absolute error
-    for (i = 0; i < dataN; i++) h_Error[i] = abs(h_ResultGPU[i] - h_ResultGPU_rp[i]);
-    float maxAbsErr = h_Error[0];
-    int iMaxAbsErr = 0;
-    for (i = 0; i < dataN; i++) if (h_Error[i] > maxAbsErr) { iMaxAbsErr = i; maxAbsErr = h_Error[i]; }
-    
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
+    printf("5) Comparing Double VS Float...\n");
 
     float maxErr = find_max(&h_maxRelErrs[0], h_maxRelErrs.size());
     printf("    Max relative errors (%d iterations): %1.2f", int(h_maxRelErrs.size()), h_maxRelErrs[0]);
     for (i = 1; i < h_maxRelErrs.size(); i++) printf(", %1.2f", h_maxRelErrs[i]);
     printf(" (max: %1.3f)\n", maxErr);
-    
-    printf("    Output max relative error: %f (%f x %f)\n", maxRelErr, h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
-    printf("    Output max absolute error: %f (%f x %f)\n", maxAbsErr, h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+
     printf("    DMR errors: %llu\n", get_dmr_error());
 
-
     // ====================================================
-    if (maxErr < 1.25 && !loadInput) {
+    if (maxErr < 0.25 && !loadInput) {
         printf("\nSaving input... ");
         bool inputSaved = save_input(h_Data, dataN, h_Kernel, kernelN, maxErr);
         printf(inputSaved ? "SAVED" : "FAILED");
         printf("\n\n");
+        exit(5);
     }
 
     if (saveOutput) {
