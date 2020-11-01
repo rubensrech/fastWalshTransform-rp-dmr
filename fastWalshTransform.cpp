@@ -296,62 +296,15 @@ int main(int argc, char *argv[]) {
     printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
     // ====================================================
-    // printf("3) Running straightforard CPU dyadic convolution... ");
-    // getTimeNow(&t1);
-
-    // dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
-
-    // getTimeNow(&t2);
-    // printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
-    // ====================================================
-    printf("4) Comparing the results... ");
-    getTimeNow(&t1);
-
-    sum_delta2 = 0;
-    sum_ref2   = 0;
-    for (i = 0; i < dataN; i++) {
-        delta       = h_ResultCPU[i] - h_ResultGPU_rp[i];
-        ref         = h_ResultCPU[i];
-        sum_delta2 += delta * delta;
-        sum_ref2   += ref * ref;
-    }
-    L2norm = sqrt(sum_delta2 / sum_ref2);
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
-    printf("    L2 norm: %E\n", L2norm);
-    printf((L2norm < 1e-6) ? "    TEST PASSED\n" : "    TEST FAILED\n");
-
-    // ====================================================
-    printf("5) Comparing Double VS Float...\n");
-
-    float maxErr = find_max(&h_maxRelErrs[0], h_maxRelErrs.size());
-    printf("    Max relative errors (%d iterations): %1.2f", int(h_maxRelErrs.size()), h_maxRelErrs[0]);
-    for (i = 1; i < h_maxRelErrs.size(); i++) printf(", %1.2f", h_maxRelErrs[i]);
-    printf(" (max: %1.3f)\n", maxErr);
-
+    printf("3) Checking for faults\n");
     printf("    DMR errors: %llu\n", get_dmr_error());
 
     // ====================================================
-    if (maxErr < 0.25 && !loadInput) {
-        printf("\nSaving input... ");
-        bool inputSaved = save_input(h_Data, dataN, h_Kernel, kernelN, maxErr);
-        printf(inputSaved ? "SAVED" : "FAILED");
-        printf("\n\n");
-        exit(5);
-    }
-
-    if (saveOutput) {
-        printf("\nSaving output... ");
-        bool outputSaved = save_output(h_ResultGPU, dataN, maxErr);
-        printf(outputSaved ? "SAVED" : "FAILED");
-        printf("\n\n");
-    }
+    printf("4) Comparing with Golden output\n");
+    printf("    ...\n");
 
     // ====================================================
-    printf("6) Shutting down\n");
+    printf("5) Shutting down\n");
     // Full-precision
     free(h_ResultGPU);
     free(h_ResultCPU);
