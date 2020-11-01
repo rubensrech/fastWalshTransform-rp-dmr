@@ -84,3 +84,14 @@ bool save_output(double *output, int N, float maxErr) {
     fclose(f);
     return true;
 }
+
+bool save_output(double *output, int N) {
+    FILE *f = fopen("output.data", "wb");
+    if (f == NULL) return false;
+
+    fwrite(&N,     sizeof(int),    1, f);
+    fwrite(output, sizeof(double), N, f);
+
+    fclose(f);
+    return true;
+}

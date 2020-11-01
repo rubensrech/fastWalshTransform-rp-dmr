@@ -149,64 +149,52 @@ double elapsedTime(Time t1, Time t2) {
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
 
-    // ===== Arguments =====
-    // > Load Input
+    // ====================================================
+    // > Managing arguments
+    // * Load Input
     char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
     bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
-
-    // > Save output
+    // * Save output
     bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
 
-    // Host data
+    // ====================================================
+    // > Declaring variables
+
+    // * Host data
     // Full-precision
-    double *h_Data, *h_Kernel, *h_ResultCPU, *h_ResultGPU;
+    double *h_Data, *h_Kernel, *h_ResultGPU;
     // Reduced-precision
     float *h_ResultGPU_rp;
-
+    // Error calculation
     float *h_Error;
     std::vector<float>h_maxRelErrs;
 
-    // Device data
+    // * Device data
     // Full-precision
     double *d_Data, *d_Kernel;
     // Reduced-precision
     float *d_Data_rp, *d_Kernel_rp;
-
+    // Error calculation
     float *d_Error;
-    cudaEvent_t startEvent, stopEvent;
 
-    double delta, ref, sum_delta2, sum_ref2, L2norm;
-    Time t1, t2;
+    // Time t1, t2;
     int i;
 
-    // ==========================================================================
-    // ==========================================================================
-    printf("1) Initializing data\n");
-
-    cudaEventCreate(&startEvent);
-    cudaEventCreate(&stopEvent);
-
     // ====================================================
-    printf("    1.1) Allocating CPU memory... ");
-    getTimeNow(&t1);
+    // > Allocating CPU memory
 
     // Full-precision
     h_Kernel    = (double*)malloc(KERNEL_SIZE);
     h_Data      = (double*)malloc(DATA_SIZE);
-    h_ResultCPU = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
     // Reduced-precision
     h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
     // Error calculation
     h_Error = (float*)malloc(DATA_SIZE_RP);
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
     
 
     // ====================================================
-    printf("    1.2) Allocating GPU memory... ");
-    getTimeNow(&t1);
+    // > Allocating GPU memory
 
     // Full-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel,     DATA_SIZE));
@@ -217,42 +205,27 @@ int main(int argc, char *argv[]) {
     // Error calculation
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Error, DATA_SIZE_RP));
 
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
     // ====================================================
-    if (loadInput) {
-        printf("    1.3) Loading input data...");
-        getTimeNow(&t1);
+    // > Generating/Loading input data
 
+    if (loadInput) {
+        // > Loading input data
         int dN = 0, kN = 0;
         load_input(input_filename, h_Data, &dN, h_Kernel, &kN);
-
-        getTimeNow(&t2);
-        printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
 
         if (dN != dataN || kN != kernelN) {
             printf("ERROR: Input data doesn't match the expected size\n");
             exit(-1);
         }
     } else {
-        printf("    1.3) Generating data... ");
-        getTimeNow(&t1);
-
+        // > Generating input data
         srand((int)time(NULL));
-        for (i = 0; i < kernelN; i++) {
-            h_Kernel[i] = (double)rand() / (double)RAND_MAX;
-        }
-        for (i = 0; i < dataN; i++) {
-            h_Data[i] = (double)rand() / (double)RAND_MAX;
-        }
-
-        getTimeNow(&t2);
-        printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
+        for (i = 0; i < kernelN; i++) h_Kernel[i] = (double)rand() / (double)RAND_MAX; 
+        for (i = 0; i < dataN; i++) h_Data[i] = (double)rand() / (double)RAND_MAX;
     }
+
     // ====================================================
-    printf("    1.4) Copying data to device... ");
-    getTimeNow(&t1);
+    // > Copying data to device
 
     // Full-precision    
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE));
@@ -260,13 +233,9 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice));
     
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
 
     // ====================================================
-    printf("2) Running dyadic convolution using Fast Walsh Transform on device... ");
-    cudaEventRecord(startEvent);
+    // > Running Fast Walsh Transform on device
 
     // Full-precision
     fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data, h_Error, d_Error, h_maxRelErrs);
@@ -274,40 +243,35 @@ int main(int argc, char *argv[]) {
     modulateGPU(d_Data, d_Data_rp, d_Kernel, dataN, h_Error, d_Error, h_maxRelErrs);
     fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data, h_Error, d_Error, h_maxRelErrs);
 
-    cudaEventRecord(stopEvent);
-    cudaEventSynchronize(stopEvent);
-
-    float ms = 0;
-    cudaEventElapsedTime(&ms, startEvent, stopEvent);
-    printf("(%3.3lf ms) \n", ms);
-    
     // ====================================================
-    printf("    2.1) Reading back device results... ");
-    getTimeNow(&t1);
+    // > Reading back device results
 
     // Full-precision
-    cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost);
     // Reduced-precision
-    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost);
-
-    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
+    cudaMemcpy(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost);
 
     // ====================================================
-    printf("3) Checking for faults\n");
-    printf("    DMR errors: %llu\n", get_dmr_error());
+    // > Saving output
+    if (saveOutput) {
+        if (!save_output(h_ResultGPU, dataN)) {
+            fprintf(stderr, "ERROR: could not save output\n");
+        }
+    }
 
     // ====================================================
-    printf("4) Comparing with Golden output\n");
-    printf("    ...\n");
+    // > Checking for faults
+    printf("DMR errors: %llu\n", get_dmr_error());
 
     // ====================================================
-    printf("5) Shutting down\n");
+    // > Checking output against Golden output
+    // ...
+
+    // ====================================================
+    // > Shutting down
+
     // Full-precision
     free(h_ResultGPU);
-    free(h_ResultCPU);
     free(h_Data);
     free(h_Kernel);
     CHECK_CUDA_ERROR(cudaFree(d_Data));

@@ -25,5 +25,6 @@ float find_max(float *array, int N);
 bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxErr);
 bool load_input(char *filename, double *data, int *dataN, double *kernel, int *kernelN);
 bool save_output(double *output, int N, float maxErr);
+bool save_output(double *output, int N);
 
 #endif
