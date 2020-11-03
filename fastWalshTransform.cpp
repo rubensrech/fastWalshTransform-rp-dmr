@@ -78,7 +78,6 @@ extern void copyGPU(float *array_rp, double *array, int N);
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
-
     // ====================================================
     // > Managing arguments
     // * Load Input
@@ -88,6 +87,8 @@ int main(int argc, char *argv[]) {
     bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
     // * Validate output
     bool validateOutput = find_int_arg(argc, argv, (char*)"-validateOutput", 0);
+    // * Measure time
+    bool measureTime = find_int_arg(argc, argv, (char*)"-measureTime", 0);
 
     // ====================================================
     // > Declaring variables
@@ -109,7 +110,10 @@ int main(int argc, char *argv[]) {
     // Error calculation
     float *d_Error;
 
+    Time t0, t1;
     int i;
+
+    if (measureTime) getTimeNow(&t0);
 
     // ====================================================
     // > Allocating CPU memory
@@ -194,14 +198,22 @@ int main(int argc, char *argv[]) {
     // > Checking for faults
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
-    printf("DMR errors: %llu\n", dmrErrors);
+    printf("> DMR errors: %llu\n", dmrErrors);
 
     // ====================================================
     // > Checking output against Golden output
     std::string gold_output_filename(input_filename);
     gold_output_filename = std::regex_replace(gold_output_filename, std::regex("input"), "output");
-    bool ouputMatchesGold = compare_output_with_golden(h_ResultGPU, dataN, gold_output_filename.c_str());
-    printf("Output matches Golden: %s\n", ouputMatchesGold ? "YES" : "NO");
+    bool outputIsCorrect = compare_output_with_golden(h_ResultGPU, dataN, gold_output_filename.c_str());
+    printf("> Output corrupted? %s\n", !outputIsCorrect ? "YES" : "NO");
+
+    // ====================================================
+    // > Classifing
+    printf("> DMR classification: ");
+    if (faultDetected && outputIsCorrect) printf("FALSE POSITIVE\n");
+    if (faultDetected && !outputIsCorrect) printf("TRUE POSITIVE\n");
+    if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
+    if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
 
     // ====================================================
     // > Shutting down
@@ -218,4 +230,9 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
     // Error calculation
     CHECK_CUDA_ERROR(cudaFree(d_Error));
+
+    if (measureTime) {
+        getTimeNow(&t1);
+        printf("> Total execution time: %.3lf ms\n", elapsedTime(t0, t1));
+    }
 }

@@ -26,9 +26,6 @@ OBJS+=$(patsubst %.cu,$(OBJ_DIR)/%.cu.o,$(notdir $(CU_FILES)))
 
 all: mkdirobj $(TARGET)
 
-test:
-	echo $(OBJS)
-
 mkdirobj:
 	mkdir -p $(OBJ_DIR)
 
@@ -47,3 +44,13 @@ clean:
 
 copy_titanV:
 	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr
+
+copy_nvbitfi_titanV:
+	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+	scp Makefile gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+
+test:
+	./fastWalshTransform -input inputs/input-0.174.data -measureTime 1
+
+golden:
+	./fastWalshTransform -input inputs/input-0.174.data > golden_stdout.txt 2> golden_stderr.txt
