@@ -63,8 +63,8 @@ const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 ////////////////////////////////////////////////////////////////////////////////
 // GPU FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
-extern void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N, float *h_err, float *d_err, std::vector<float> &max_errs);
-extern void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N, float *h_err, float *d_err, std::vector<float> &max_errs);
+extern void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N);
+extern void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N);
 
 extern void check_relative_error_gpu(double *array, float *array_rp, int N);
 extern void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
@@ -98,17 +98,12 @@ int main(int argc, char *argv[]) {
     double *h_Data, *h_Kernel, *h_ResultGPU;
     // Reduced-precision
     float *h_ResultGPU_rp;
-    // Error calculation
-    float *h_Error;
-    std::vector<float>h_maxRelErrs;
 
     // * Device data
     // Full-precision
     double *d_Data, *d_Kernel;
     // Reduced-precision
     float *d_Data_rp, *d_Kernel_rp;
-    // Error calculation
-    float *d_Error;
 
     Time t0, t1;
     int i;
@@ -123,10 +118,7 @@ int main(int argc, char *argv[]) {
     h_Data      = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
     // Reduced-precision
-    h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
-    // Error calculation
-    h_Error = (float*)malloc(DATA_SIZE_RP);
-    
+    h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);    
 
     // ====================================================
     // > Allocating GPU memory
@@ -137,8 +129,6 @@ int main(int argc, char *argv[]) {
     // Reduced-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data_rp,    DATA_SIZE_RP));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel_rp,  DATA_SIZE_RP));
-    // Error calculation
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Error, DATA_SIZE_RP));
 
     // ====================================================
     // > Generating/Loading input data
@@ -167,10 +157,10 @@ int main(int argc, char *argv[]) {
     // > Running Fast Walsh Transform on device
 
     // Full-precision
-    fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data, h_Error, d_Error, h_maxRelErrs);
-    fwtBatchGPU(d_Kernel, d_Kernel_rp, 1, log2Data, h_Error, d_Error, h_maxRelErrs);
-    modulateGPU(d_Data, d_Data_rp, d_Kernel, dataN, h_Error, d_Error, h_maxRelErrs);
-    fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data, h_Error, d_Error, h_maxRelErrs);
+    fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data);
+    fwtBatchGPU(d_Kernel, d_Kernel_rp, 1, log2Data);
+    modulateGPU(d_Data, d_Data_rp, d_Kernel, dataN);
+    fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data);
 
     // ====================================================
     // > Reading back device results
@@ -228,8 +218,6 @@ int main(int argc, char *argv[]) {
     free(h_ResultGPU_rp);
     CHECK_CUDA_ERROR(cudaFree(d_Data_rp));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
-    // Error calculation
-    CHECK_CUDA_ERROR(cudaFree(d_Error));
 
     if (measureTime) {
         getTimeNow(&t1);
