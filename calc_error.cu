@@ -44,10 +44,10 @@ __forceinline__  __device__ void uint_error(double rhs, float lhs, uint32_t thre
 __global__ void check_error_kernel(double *array, float *array_rp, int N) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < N)
-#ifdef RELATIVE_ERROR
-        relative_error(array[tid], array_rp[tid]);
+#if ERROR_METRIC == UINT_ERROR
+        uint_error(array[tid], array_rp[tid], UINT_THRESHOLD);
 #else
-        uint_error(array[tid], array_rp[tid], 0);
+        relative_error(array[tid], array_rp[tid]);
 #endif
 }
 

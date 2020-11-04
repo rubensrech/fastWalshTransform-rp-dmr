@@ -1,4 +1,5 @@
-RELATIVE_ERROR=0
+ERROR_METRIC=uint_error		# relative_error | uint_error
+FIND_THRESHOLD=1
 
 TARGET=fastWalshTransform
 SRC_DIR=.
@@ -26,9 +27,19 @@ CUO_FILES=$(addprefix $(OBJ_DIR)/,$(notdir $(CU_FILES:.cu=.o)))
 OBJS=$(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(CPP_FILES)))
 OBJS+=$(patsubst %.cu,$(OBJ_DIR)/%.cu.o,$(notdir $(CU_FILES)))
 
-ifeq ($(RELATIVE_ERROR), 1) 
-CXXFLAGS+= -DRELATIVE_ERROR
-NVCCFLAGS+= -DRELATIVE_ERROR
+ifeq ($(ERROR_METRIC), relative_error) 
+CXXFLAGS+= -DERROR_METRIC=0
+NVCCFLAGS+= -DERROR_METRIC=0
+endif
+
+ifeq ($(ERROR_METRIC), uint_error) 
+CXXFLAGS+= -DERROR_METRIC=1
+NVCCFLAGS+= -DERROR_METRIC=1
+endif
+
+ifeq ($(FIND_THRESHOLD), 1) 
+CXXFLAGS+= -DFIND_THRESHOLD
+NVCCFLAGS+= -DFIND_THRESHOLD
 endif
 
 all: mkdirobj $(TARGET)

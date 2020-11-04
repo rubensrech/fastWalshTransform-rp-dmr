@@ -157,14 +157,24 @@ void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N) {
     for(; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2){
         fwtBatch2Kernel<<<grid, 256>>>(d_Data, d_Output_rp, d_Data, N / 4);
         CHECK_CUDA_ERROR(cudaPeekAtLastError());
-        // check_error_gpu(d_Data, d_Output_rp, N);
+
+#ifdef FIND_THRESHOLD
         find_max_uint_error_gpu(d_Data, d_Output_rp, N);
+#else
+        check_error_gpu(d_Data, d_Output_rp, N);
+#endif  
+
     }
 
     fwtBatch1Kernel<<<M, N / 4, N * sizeof(double) + N * sizeof(float)>>>(d_Data, d_Output_rp, d_Data, log2N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
-    // check_error_gpu(d_Data, d_Output_rp, N);
+
+#ifdef FIND_THRESHOLD
     find_max_uint_error_gpu(d_Data, d_Output_rp, N);
+#else
+    check_error_gpu(d_Data, d_Output_rp, N);
+#endif
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -184,8 +194,12 @@ __global__ void modulateKernel(double *d_A, float *d_A_rp, double *d_B, int N){
 void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N) {
     modulateKernel<<<128, 256>>>(d_A, d_A_rp, d_B, N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
-    // check_error_gpu(d_A, d_A_rp, N);
+
+#ifdef FIND_THRESHOLD
     find_max_uint_error_gpu(d_A, d_A_rp, N);
+#else
+    check_error_gpu(d_A, d_A_rp, N);
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

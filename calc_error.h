@@ -1,8 +1,13 @@
 #ifndef CALC_ERROR_H
 #define CALC_ERROR_H
 
+#define REL_ERROR    0
+#define UINT_ERROR   1
+
 #define MIN_PERCENTAGE 0.82f
 #define MAX_PERCENTAGE 1.18f
+
+#define UINT_THRESHOLD 0
 
 #define SUB_ABS(lhs, rhs) ((lhs > rhs) ? (lhs - rhs) : (rhs - lhs))
 

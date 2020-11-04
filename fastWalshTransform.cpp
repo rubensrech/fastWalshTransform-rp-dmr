@@ -63,16 +63,18 @@ const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 ////////////////////////////////////////////////////////////////////////////////
 // GPU FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
+#include "calc_error.h"
+
 extern void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N);
 extern void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N);
 
-extern unsigned int get_max_uint_error_non_zeros();
-extern unsigned int get_max_uint_error_zeros();
+// extern unsigned int get_max_uint_error_non_zeros();
+// extern unsigned int get_max_uint_error_zeros();
 
-extern void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
-extern unsigned long long get_dmr_error();
+// extern void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
+// extern unsigned long long get_dmr_error();
 
-extern void copyGPU(float *array_rp, double *array, int N);
+// extern void copyGPU(float *array_rp, double *array, int N);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
@@ -185,14 +187,25 @@ int main(int argc, char *argv[]) {
     }
 
     // ====================================================
+    // > Finding UINT threshold
+#ifdef FIND_THRESHOLD
 
+#if ERROR_METRIC == UINT_ERROR
 
     printf("Max UINT error (non zero values): %u\n", get_max_uint_error_non_zeros());
     printf("Max UINT error (zero values): %u\n", get_max_uint_error_zeros());
 
+#else
 
+    printf("RELATIVE ERROR: Unimplemented\n");
+
+#endif
+
+#else
     // ====================================================
     // > Checking for faults
+    printf("> Error metric: %s\n", ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error");
+
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
     printf("> DMR errors: %llu\n", dmrErrors);
@@ -211,6 +224,7 @@ int main(int argc, char *argv[]) {
     if (faultDetected && !outputIsCorrect) printf("TRUE POSITIVE\n");
     if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
     if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
+#endif
 
     // ====================================================
     // > Shutting down
