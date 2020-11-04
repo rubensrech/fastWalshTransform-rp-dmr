@@ -1,3 +1,5 @@
+RELATIVE_ERROR=0
+
 TARGET=fastWalshTransform
 SRC_DIR=.
 OBJ_DIR=./obj
@@ -24,6 +26,11 @@ CUO_FILES=$(addprefix $(OBJ_DIR)/,$(notdir $(CU_FILES:.cu=.o)))
 OBJS=$(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(CPP_FILES)))
 OBJS+=$(patsubst %.cu,$(OBJ_DIR)/%.cu.o,$(notdir $(CU_FILES)))
 
+ifeq ($(RELATIVE_ERROR), 1) 
+CXXFLAGS+= -DRELATIVE_ERROR
+NVCCFLAGS+= -DRELATIVE_ERROR
+endif
+
 all: mkdirobj $(TARGET)
 
 mkdirobj:
@@ -44,6 +51,7 @@ clean:
 
 copy_titanV:
 	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr
+	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
 	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
