@@ -185,12 +185,12 @@ void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
 
-// > Max relative error
+// > Max relative / absolute error
 
 __device__ float relErrArray[1 << 24];
 __device__ float absErrArray[1 << 24];
 
-__global__ void find_max_relative_error_kernel(double *array, float *array_rp, int N) {
+__global__ void calc_relative_and_abs_error_kernel(double *array, float *array_rp, int N) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < N) {
         float lhs = array_rp[i];
@@ -216,9 +216,9 @@ double maxAbsErrDoubleVal = 0;
 float maxAbsErrFloatVal = 0;
 uint32_t maxAbsErrUINTErr = 0;
 
-void find_max_relative_error_gpu(double *array, float *array_rp, int N) {
+void find_max_relative_and_abs_error_gpu(double *array, float *array_rp, int N) {
     int gridDim = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    find_max_relative_error_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, N);
+    calc_relative_and_abs_error_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, N);
 
     // > Relative error
 
@@ -272,3 +272,77 @@ float get_max_abs_error() { return maxAbsErr; }
 float get_max_abs_error_double_val() { return maxAbsErrDoubleVal; }
 float get_max_abs_error_float_val() { return maxAbsErrFloatVal; }
 float get_max_abs_error_uint_err() { return maxAbsErrUINTErr; }
+
+// > Hybrid check error (relative + abs error)
+
+#define ABS_ERR_UPPER_BOUND_VAL     0.02
+#define IGNORE_FLAG                 -999
+
+__global__ void calc_error_hybrid_kernel(double *array, float *array_rp, int N) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < N) {
+        float lhs = abs(array_rp[i]);
+        float rhs = __double2float_rz(abs(array[i]));
+
+        if (rhs == 0 || lhs == 0) {
+            // ABSOLUTE ERROR
+             [i] = abs(rhs - lhs);
+            relErrArray[i] = IGNORE_FLAG;
+        } else if (rhs < ABS_ERR_UPPER_BOUND_VAL && lhs < ABS_ERR_UPPER_BOUND_VAL) {
+            // ABSOLUTE ERROR
+            absErrArray[i] = abs(rhs - lhs);
+            relErrArray[i] = IGNORE_FLAG;
+        } else if (rhs >= ABS_ERR_UPPER_BOUND_VAL || lhs >= ABS_ERR_UPPER_BOUND_VAL) {
+            // RELATIVE ERROR
+            absErrArray[i] = IGNORE_FLAG;
+            relErrArray[i] = abs(1 - lhs / rhs);
+        }
+    }
+}
+
+void calc_error_hybrid_gpu(double *array, float *array_rp, int N) {
+    int gridDim = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    calc_error_hybrid_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, N);
+
+    // > Relative error
+
+    cudaMemcpyFromSymbol(tmpArr, relErrArray, sizeof(float) * N, 0, cudaMemcpyDeviceToHost);
+    int max_rel_err_index = find_max_i(tmpArr, N);
+    float max_rel_err = tmpArr[max_rel_err_index];
+
+    double max_rel_err_double_val; cudaMemcpy(&max_rel_err_double_val, array + max_rel_err_index, sizeof(double), cudaMemcpyDeviceToHost);
+    float max_rel_err_float_val; cudaMemcpy(&max_rel_err_float_val, array_rp + max_rel_err_index, sizeof(float), cudaMemcpyDeviceToHost);
+    
+    float rhs_as_float = (float)(max_rel_err_double_val);
+	uint32_t lhs_data = *((uint32_t*) &max_rel_err_float_val);
+    uint32_t rhs_data = *((uint32_t*) &rhs_as_float);
+    uint32_t uintErr = SUB_ABS(lhs_data, rhs_data);
+
+    if (max_rel_err > maxRelErr) {
+        maxRelErr = max_rel_err;
+        maxRelErrDoubleVal = max_rel_err_double_val;
+        maxRelErrFloatVal = max_rel_err_float_val;
+        maxRelErrUINTErr = uintErr;
+    }
+
+    // > Absolute error
+
+    cudaMemcpyFromSymbol(tmpArr, absErrArray, sizeof(float) * N, 0, cudaMemcpyDeviceToHost);
+    int max_abs_err_index = find_max_i(tmpArr, N);
+    float max_abs_err = tmpArr[max_abs_err_index];
+
+    double max_abs_err_double_val; cudaMemcpy(&max_abs_err_double_val, array + max_abs_err_index, sizeof(double), cudaMemcpyDeviceToHost);
+    float max_abs_err_float_val; cudaMemcpy(&max_abs_err_float_val, array_rp + max_abs_err_index, sizeof(float), cudaMemcpyDeviceToHost);
+
+    rhs_as_float = (float)(max_abs_err_double_val);
+	lhs_data = *((uint32_t*) &max_abs_err_float_val);
+    rhs_data = *((uint32_t*) &rhs_as_float);
+    uintErr = SUB_ABS(lhs_data, rhs_data);
+
+    if (max_abs_err > maxAbsErr) {
+        maxAbsErr = max_abs_err;
+        maxAbsErrDoubleVal = max_abs_err_double_val;
+        maxAbsErrFloatVal = max_abs_err_float_val;
+        maxAbsErrUINTErr = uintErr;
+    }
+}

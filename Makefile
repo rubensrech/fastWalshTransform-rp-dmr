@@ -1,4 +1,4 @@
-ERROR_METRIC=uint_error		# relative_error | uint_error
+ERROR_METRIC=uint_error
 FIND_THRESHOLD=1
 
 TARGET=fastWalshTransform

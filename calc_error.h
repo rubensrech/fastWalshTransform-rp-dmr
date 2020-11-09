@@ -30,7 +30,8 @@ void get_diffs_distribution(unsigned long long *dist);
 
 void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
 
-void find_max_relative_error_gpu(double *array, float *array_rp, int N);
+void find_max_relative_and_abs_error_gpu(double *array, float *array_rp, int N);
+void calc_error_hybrid_gpu(double *array, float *array_rp, int N);
 
 float get_max_rel_error();
 float get_max_rel_error_double_val();
