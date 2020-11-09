@@ -2,11 +2,15 @@
 
 #include <stdlib.h>
 
-float find_max(float *array, int N) {
-    float max = array[0];
+unsigned int log2_host(unsigned int n) {
+    return (n > 1) ? 1 + log2(n >> 1) : 0;
+}
+
+float find_max_i(float *array, int N) {
+    int iMax = 0;
     for (int i = 1; i < N; i++)
-        if (array[i] > max) max = array[i];
-    return max;
+        if (array[i] > array[iMax]) iMax = i;
+    return iMax;
 }
 
 // > Timing functions
@@ -58,10 +62,7 @@ char *find_char_arg(int argc, char **argv, char *arg, char *def) {
 
 // > Input/Output functions
 
-bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxErr) {
-    char filename[100];
-    snprintf(filename, 100, "input-%1.3f.data", maxErr);
-
+bool save_input(double *data, int dataN, double *kernel, int kernelN, char *filename) {
     FILE *f = fopen(filename, "wb");
     if (f == NULL) {
         fprintf(stderr, "ERROR: could not save input to file\n");
@@ -76,6 +77,18 @@ bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxE
 
     fclose(f);
     return true;
+}
+
+bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxErr) {
+    char filename[100];
+    snprintf(filename, 100, "input-%1.3f.data", maxErr);
+    return save_input(data, dataN, kernel, kernelN, filename);
+}
+
+bool save_input(double *data, int dataN, double *kernel, int kernelN, int maxErrBit) {
+    char filename[100];
+    snprintf(filename, 100, "input-bit-%d.data", maxErrBit);
+    return save_input(data, dataN, kernel, kernelN, filename);
 }
 
 bool load_input(char *filename, double *data, int dataN, double *kernel, int kernelN) {

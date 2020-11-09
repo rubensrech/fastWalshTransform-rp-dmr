@@ -62,11 +62,15 @@ clean:
 
 copy_titanV:
 	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr
-	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
+	# scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
 	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
 	scp Makefile gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+
+copy_p100:
+	scp *.{cu,h,cpp} gppd:fastWalshTransform-dmr
+	# scp Makefile gppd:fastWalshTransform-dmr
 
 test:
 	./fastWalshTransform -input inputs/input-0.174.data -measureTime 1

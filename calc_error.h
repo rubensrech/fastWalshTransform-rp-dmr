@@ -18,6 +18,28 @@ void find_max_uint_error_gpu(double *array, float *array_rp, int N) ;
 unsigned int get_max_uint_error_non_zeros();
 unsigned int get_max_uint_error_zeros();
 
+unsigned long long get_zeros_fp64();
+unsigned long long get_zeros_fp32();
+unsigned long long get_negatives();
+unsigned long long get_zeros_diff_gt_non_zeros_thresh();
+unsigned int get_max_diff_zeros_double_val();
+unsigned int get_max_diff_zeros_float_val();
+unsigned int get_max_diff_non_zeros_double_val();
+unsigned int get_max_diff_non_zeros_float_val();
+void get_diffs_distribution(unsigned long long *dist);
+
 void calc_relative_error_gpu(double *array, float *array_rp, float *err_out, int N);
+
+void find_max_relative_error_gpu(double *array, float *array_rp, int N);
+
+float get_max_rel_error();
+float get_max_rel_error_double_val();
+float get_max_rel_error_float_val();
+float get_max_rel_error_uint_err();
+
+float get_max_abs_error();
+float get_max_abs_error_double_val();
+float get_max_abs_error_float_val();
+float get_max_abs_error_uint_err();
 
 #endif

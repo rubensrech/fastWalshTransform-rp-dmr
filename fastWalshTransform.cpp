@@ -38,6 +38,8 @@
 #include <string>
 #include <string.h>
 #include <regex>
+#include <bitset>
+#include <iostream>
 
 #include "util.h"
 #include "fwtCPU.h"
@@ -85,6 +87,10 @@ int main(int argc, char *argv[]) {
     // * Load Input
     char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
     bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
+    // * Save input
+    bool saveInput = find_int_arg(argc, argv, (char*)"-saveInput", 0);
+    // * Save input UINT thresh
+    int saveInputBitThresh = find_int_arg(argc, argv, (char*)"-saveInputBitThresh", 0);
     // * Save output
     bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
     // * Validate output
@@ -177,6 +183,20 @@ int main(int argc, char *argv[]) {
     if (validateOutput) {
         validateGPUOutput(h_Data, h_Kernel, log2Data, log2Kernel, h_ResultGPU);
     }
+
+    // ====================================================
+    // > Saving input
+    unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
+    int maxErrorBit = log2_host(maxUINTError);
+    unsigned int UINTThresh = 1 << saveInputBitThresh;
+    bool inputSaved = false;
+    if (saveInput && maxUINTError <= UINTThresh) {
+        if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
+            fprintf(stderr, "ERROR: could not save input\n");
+        } else {
+            inputSaved = true;
+        }
+    }
     
     // ====================================================
     // > Saving output
@@ -192,8 +212,34 @@ int main(int argc, char *argv[]) {
 
 #if ERROR_METRIC == UINT_ERROR
 
-    printf("Max UINT error (non zero values): %u\n", get_max_uint_error_non_zeros());
-    printf("Max UINT error (zero values): %u\n", get_max_uint_error_zeros());
+    printf("Zeros FP64: %llu\n", get_zeros_fp64());
+    printf("Zeros FP32: %llu\n", get_zeros_fp32());
+    printf("Negatives: %llu\n", get_negatives());
+
+    // > UINT Errors distribution
+    printf("\n");
+    unsigned long long dist[33];
+    get_diffs_distribution(dist);
+    printf("UINT errors distributions:\n");
+    for (i = 0; i < 33; i++) {
+        printf("  Bit %d: %llu\n", i, dist[i]);
+    }
+
+    printf("\n");
+    printf("Max UINT error (non zero values): %10u\n", get_max_uint_error_non_zeros());
+    printf("Max UINT error (zero values):     %10u\n", get_max_uint_error_zeros());
+
+    printf("\n");
+    printf("Zeros diff > Non zeros thresh: %llu\n", get_zeros_diff_gt_non_zeros_thresh());
+    std::cout << "Max diff zeros double val: " << std::bitset<32>(get_max_diff_zeros_double_val()) << std::endl;
+    std::cout << "Max diff zeros float val: " << std::bitset<32>(get_max_diff_zeros_float_val()) << std::endl;
+
+    printf("\n");
+    printf("Max relative error: %f ", get_max_rel_error());
+    printf("(%.10e X %.10e)\n", get_max_rel_error_double_val(), get_max_rel_error_float_val());
+    printf("Max absolute error: %f ", get_max_abs_error());
+    printf("(%lf X %f)\n", get_max_abs_error_double_val(), get_max_abs_error_float_val());
+    printf("Max UINT error: %10u\n", maxUINTError);
 
 #else
 
@@ -225,6 +271,11 @@ int main(int argc, char *argv[]) {
     if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
     if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
 #endif
+
+    if (inputSaved) {
+        printf("\nINPUT SAVED SUCCESSFULLY! (Max error bit: %d)\n", maxErrorBit);
+        exit(5);
+    }
 
     // ====================================================
     // > Shutting down

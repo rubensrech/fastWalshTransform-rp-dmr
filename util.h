@@ -26,10 +26,15 @@ typedef struct timeval Time;
 void getTimeNow(Time *t);
 double elapsedTime(Time t1, Time t2);
 
+void printbits(unsigned int v);
+
+unsigned int log2_host(unsigned int n);
+
 int find_int_arg(int argc, char **argv, char *arg, int def);
 char *find_char_arg(int argc, char **argv, char *arg, char *def);
-float find_max(float *array, int N);
+float find_max_i(float *array, int N);
 bool save_input(double *data, int dataN, double *kernel, int kernelN, float maxErr);
+bool save_input(double *data, int dataN, double *kernel, int kernelN, int maxErrBit);
 bool load_input(char *filename, double *data, int dataN, double *kernel, int kernelN);
 bool save_output(double *output, int N, float maxErr);
 bool save_output(double *output, int N);
