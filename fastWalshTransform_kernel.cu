@@ -160,7 +160,6 @@ void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N) {
 
 #ifdef FIND_THRESHOLD
         find_max_uint_error_gpu(d_Data, d_Output_rp, N);
-        // find_max_relative_and_abs_error_gpu(d_Data, d_Output_rp, N);
         calc_error_hybrid_gpu(d_Data, d_Output_rp, N);
 #else
         check_error_gpu(d_Data, d_Output_rp, N);
@@ -173,7 +172,6 @@ void fwtBatchGPU(double *d_Data, float *d_Output_rp, int M, int log2N) {
 
 #ifdef FIND_THRESHOLD
     find_max_uint_error_gpu(d_Data, d_Output_rp, N);
-    // find_max_relative_and_abs_error_gpu(d_Data, d_Output_rp, N);
     calc_error_hybrid_gpu(d_Data, d_Output_rp, N);
 #else
     check_error_gpu(d_Data, d_Output_rp, N);
@@ -201,7 +199,6 @@ void modulateGPU(double *d_A, float *d_A_rp, double *d_B, int N) {
 
 #ifdef FIND_THRESHOLD
     find_max_uint_error_gpu(d_A, d_A_rp, N);
-    // find_max_relative_and_abs_error_gpu(d_A, d_A_rp, N);
     calc_error_hybrid_gpu(d_A, d_A_rp, N);
 #else
     check_error_gpu(d_A, d_A_rp, N);

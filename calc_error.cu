@@ -6,7 +6,7 @@ __device__ unsigned int log2(unsigned int n) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Relative error functions
+// Check error functions
 ////////////////////////////////////////////////////////////////////////////////
 
 // > Check relative error
@@ -33,23 +33,50 @@ __forceinline__  __device__ void relative_error(double val, float val_rp) {
     }
 }
 
-__forceinline__  __device__ void uint_error(double rhs, float lhs, uint32_t threshold) {
+__forceinline__  __device__ void uint_error(double rhs, float lhs) {
 	float rhs_as_float = float(rhs);
 	uint32_t lhs_data = *((uint32_t*) &lhs);
 	uint32_t rhs_data = *((uint32_t*) &rhs_as_float);
 
 	uint32_t diff = SUB_ABS(lhs_data, rhs_data);
 
-	if (diff > threshold) {
+	if (diff > UINT_THRESHOLD) {
 		atomicAdd(&errors, 1);
 	}
+}
+
+__forceinline__  __device__ void hybrid_error(double val, float val_rp) {
+    float lhs = abs(val_rp);
+    float rhs = __double2float_rz(abs(val));
+
+    if (rhs == 0 || lhs == 0) {
+        // ABSOLUTE ERROR
+        float abs_err = SUB_ABS(rhs, lhs);
+        if (abs_err > ABS_ERR_THRESHOLD) {
+            atomicAdd(&errors, 1);
+        }
+    } else if (rhs < ABS_ERR_UPPER_BOUND_VAL && lhs < ABS_ERR_UPPER_BOUND_VAL) {
+        // ABSOLUTE ERROR
+        float abs_err = SUB_ABS(rhs, lhs);
+        if (abs_err > ABS_ERR_THRESHOLD) {
+            atomicAdd(&errors, 1);
+        }
+    } else if (rhs >= ABS_ERR_UPPER_BOUND_VAL || lhs >= ABS_ERR_UPPER_BOUND_VAL) {
+        // RELATIVE ERROR
+        float rel_err = SUB_ABS(1, lhs / rhs);
+        if (rel_err > REL_ERR_THRESHOLD) {
+            atomicAdd(&errors, 1);
+        }
+    }
 }
 
 __global__ void check_error_kernel(double *array, float *array_rp, int N) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < N)
-#if ERROR_METRIC == UINT_ERROR
-        uint_error(array[tid], array_rp[tid], UINT_THRESHOLD);
+#if ERROR_METRIC == HYBRID
+        hybrid_error(array[tid], array_rp[tid]);
+#elif ERROR_METRIC == UINT_ERROR
+        uint_error(array[tid], array_rp[tid]);
 #else
         relative_error(array[tid], array_rp[tid]);
 #endif
@@ -60,6 +87,10 @@ void check_error_gpu(double *array, float *array_rp, int N) {
     check_error_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Find max error functions
+////////////////////////////////////////////////////////////////////////////////
 
 // > Max UINT error
 
@@ -273,10 +304,7 @@ float get_max_abs_error_double_val() { return maxAbsErrDoubleVal; }
 float get_max_abs_error_float_val() { return maxAbsErrFloatVal; }
 float get_max_abs_error_uint_err() { return maxAbsErrUINTErr; }
 
-// > Hybrid check error (relative + abs error)
-
-#define ABS_ERR_UPPER_BOUND_VAL     0.02
-#define IGNORE_FLAG                 -999
+// > Hybrid error (relative + abs error)
 
 __global__ void calc_error_hybrid_kernel(double *array, float *array_rp, int N) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -286,15 +314,15 @@ __global__ void calc_error_hybrid_kernel(double *array, float *array_rp, int N) 
 
         if (rhs == 0 || lhs == 0) {
             // ABSOLUTE ERROR
-             [i] = abs(rhs - lhs);
-            relErrArray[i] = IGNORE_FLAG;
+            absErrArray[i] = abs(rhs - lhs);
+            relErrArray[i] = IGNORE_VAL_FLAG;
         } else if (rhs < ABS_ERR_UPPER_BOUND_VAL && lhs < ABS_ERR_UPPER_BOUND_VAL) {
             // ABSOLUTE ERROR
             absErrArray[i] = abs(rhs - lhs);
-            relErrArray[i] = IGNORE_FLAG;
+            relErrArray[i] = IGNORE_VAL_FLAG;
         } else if (rhs >= ABS_ERR_UPPER_BOUND_VAL || lhs >= ABS_ERR_UPPER_BOUND_VAL) {
             // RELATIVE ERROR
-            absErrArray[i] = IGNORE_FLAG;
+            absErrArray[i] = IGNORE_VAL_FLAG;
             relErrArray[i] = abs(1 - lhs / rhs);
         }
     }

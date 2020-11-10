@@ -1,5 +1,6 @@
-ERROR_METRIC=uint_error
-FIND_THRESHOLD=1
+# ERROR_METRIC = uint_error | relative_error | hybrid
+ERROR_METRIC=hybrid
+FIND_THRESHOLD=0
 
 TARGET=fastWalshTransform
 SRC_DIR=.
@@ -37,6 +38,11 @@ CXXFLAGS+= -DERROR_METRIC=1
 NVCCFLAGS+= -DERROR_METRIC=1
 endif
 
+ifeq ($(ERROR_METRIC), hybrid) 
+CXXFLAGS+= -DERROR_METRIC=2
+NVCCFLAGS+= -DERROR_METRIC=2
+endif
+
 ifeq ($(FIND_THRESHOLD), 1) 
 CXXFLAGS+= -DFIND_THRESHOLD
 NVCCFLAGS+= -DFIND_THRESHOLD
@@ -62,7 +68,7 @@ clean:
 
 copy_titanV:
 	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr
-	# scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
+	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
 	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
@@ -73,7 +79,7 @@ copy_p100:
 	# scp Makefile gppd:fastWalshTransform-dmr
 
 test:
-	./fastWalshTransform -input inputs/input-0.174.data -measureTime 1
+	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1
 
 golden:
-	./fastWalshTransform -input inputs/input-0.174.data > golden_stdout.txt 2> golden_stderr.txt
+	./fastWalshTransform -input inputs/input-bit-21.data > golden_stdout.txt 2> golden_stderr.txt

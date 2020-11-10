@@ -201,7 +201,9 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Saving output
     if (saveOutput) {
-        if (!save_output(h_ResultGPU, dataN)) {
+        if (save_output(h_ResultGPU, dataN)) {
+            printf("OUTPUT SAVED SUCCESSFULY\n");
+        } else {
             fprintf(stderr, "ERROR: could not save output\n");
         }
     }
@@ -250,11 +252,11 @@ int main(int argc, char *argv[]) {
 #else
     // ====================================================
     // > Checking for faults
-    printf("> Error metric: %s\n", ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error");
+    printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (UINT_ERROR ? "UINT Error" : "Relative Error"));
 
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
-    printf("> DMR errors: %llu\n", dmrErrors);
+    printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
 
     // ====================================================
     // > Checking output against Golden output

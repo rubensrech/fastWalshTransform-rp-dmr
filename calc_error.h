@@ -3,11 +3,18 @@
 
 #define REL_ERROR    0
 #define UINT_ERROR   1
+#define HYBRID       2
 
 #define MIN_PERCENTAGE 0.82f
 #define MAX_PERCENTAGE 1.18f
 
-#define UINT_THRESHOLD 0
+#define UINT_THRESHOLD      0
+
+#define ABS_ERR_THRESHOLD   0.0003200 // Max ABS error(input-bit-21.data) = 0.000315
+#define REL_ERR_THRESHOLD   0.004850f // Max REL error(input-bit-21.data) = 0.004843
+
+#define ABS_ERR_UPPER_BOUND_VAL     0.02
+#define IGNORE_VAL_FLAG             -999
 
 #define SUB_ABS(lhs, rhs) ((lhs > rhs) ? (lhs - rhs) : (rhs - lhs))
 
