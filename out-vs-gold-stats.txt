@@ -1,0 +1,75 @@
+===================================================
+========== Output VS Golden output stats ==========
+===================================================
+  > Outputs match: NO
+  > Number of diff values: 8388608
+
+  > Max absolute err: 3.03543856716714799404e-11
+  > Min absolute err: 3.03472802443138789386e-11
+  > Avg absolute err: 3.03512470508012519119e-11
+
+  > Number of errors in each bit:
+    * Bit  0: 0
+    * Bit  1: 0
+    * Bit  2: 0
+    * Bit  3: 0
+    * Bit  4: 0
+    * Bit  5: 0
+    * Bit  6: 0
+    * Bit  7: 0
+    * Bit  8: 0
+    * Bit  9: 0
+    * Bit 10: 0
+    * Bit 11: 0
+    * Bit 12: 7201401
+    * Bit 13: 1187197
+    * Bit 14: 0
+    * Bit 15: 0
+    * Bit 16: 0
+    * Bit 17: 0
+    * Bit 18: 0
+    * Bit 19: 0
+    * Bit 20: 0
+    * Bit 21: 0
+    * Bit 22: 0
+    * Bit 23: 0
+    * Bit 24: 0
+    * Bit 25: 0
+    * Bit 26: 0
+    * Bit 27: 0
+    * Bit 28: 0
+    * Bit 29: 0
+    * Bit 30: 0
+    * Bit 31: 10
+    * Bit 32: 0
+    * Bit 33: 0
+    * Bit 34: 0
+    * Bit 35: 0
+    * Bit 36: 0
+    * Bit 37: 0
+    * Bit 38: 0
+    * Bit 39: 0
+    * Bit 40: 0
+    * Bit 41: 0
+    * Bit 42: 0
+    * Bit 43: 0
+    * Bit 44: 0
+    * Bit 45: 0
+    * Bit 46: 0
+    * Bit 47: 0
+    * Bit 48: 0
+    * Bit 49: 0
+    * Bit 50: 0
+    * Bit 51: 0
+    * Bit 52: 0
+    * Bit 53: 0
+    * Bit 54: 0
+    * Bit 55: 0
+    * Bit 56: 0
+    * Bit 57: 0
+    * Bit 58: 0
+    * Bit 59: 0
+    * Bit 60: 0
+    * Bit 61: 0
+    * Bit 62: 0
+    * Bit 63: 0
