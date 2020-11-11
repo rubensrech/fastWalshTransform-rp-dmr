@@ -169,13 +169,51 @@ bool compare_output_with_golden(double *output, int N, const char *filename) {
     gold_output = (double*)malloc(N * sizeof(double));
     fread(gold_output, sizeof(double), N, f);
 
+    bool outputsMatch = true;
+    int countDiffs = 0;
+    double minAbsErr = __DBL_MAX__, maxAbsErr = __DBL_MIN__, avgAbsErr = 0;
+    uint32_t bitErrs[64] = {0};
     for (i = 0; i < N; i++) {
         if (output[i] != gold_output[i]) {
-            return false;
+            outputsMatch = false;
+            countDiffs++;
+
+            // UINT diff
+            uint32_t outData = *((uint32_t*) &(output[i]));
+            uint32_t goldData = *((uint32_t*) &(gold_output[i]));
+            uint32_t uintErr = SUB_ABS(outData, goldData);
+            int errBit = log2_host(uintErr);
+            bitErrs[errBit]++;
+            // Abs diff
+            double absErr = SUB_ABS(output[i], gold_output[i]);
+            if (absErr > maxAbsErr) maxAbsErr = absErr;
+            if (absErr < minAbsErr) minAbsErr = absErr;
+            avgAbsErr += absErr;
         }
+    }
+    if (countDiffs > 0) {
+        avgAbsErr /= countDiffs;
+    } else {
+        avgAbsErr = minAbsErr = maxAbsErr = 0;
+    }
+    // Save stats to file
+    FILE *fstats = fopen("out-vs-gold-stats.txt", "w");
+    fprintf(fstats, "===================================================\n");
+    fprintf(fstats, "========== Output VS Golden output stats ==========\n");
+    fprintf(fstats, "===================================================\n");
+    fprintf(fstats, "  > Outputs match: %s\n", outputsMatch ? "YES" : "NO");
+    fprintf(fstats, "  > Number of diff values: %u\n", countDiffs);
+    fprintf(fstats, "\n");
+    fprintf(fstats, "  > Max absolute err: %.20e\n", maxAbsErr);
+    fprintf(fstats, "  > Min absolute err: %.20e\n", minAbsErr);
+    fprintf(fstats, "  > Avg absolute err: %.20e\n", avgAbsErr);
+    fprintf(fstats, "\n");
+    fprintf(fstats, "  > Number of errors in each bit:\n");
+    for (i = 0; i < 64; i++) {
+        fprintf(fstats, "    * Bit %2u: %u\n", i, bitErrs[i]);
     }
 
     fclose(f);
-
-    return true;
+    fclose(fstats);
+    return outputsMatch;
 }

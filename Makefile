@@ -71,7 +71,7 @@ copy_titanV:
 	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
-	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+	# scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
 	scp Makefile gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
 
 copy_p100:
@@ -83,3 +83,4 @@ test:
 
 golden:
 	./fastWalshTransform -input inputs/input-bit-21.data > golden_stdout.txt 2> golden_stderr.txt
+	mv out-vs-gold-stats.txt golden_out-vs-gold-stats.txt

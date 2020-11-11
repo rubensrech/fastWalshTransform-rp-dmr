@@ -297,4 +297,8 @@ int main(int argc, char *argv[]) {
         getTimeNow(&t1);
         printf("> Total execution time: %.3lf ms\n", elapsedTime(t0, t1));
     }
+
+    if (faultDetected) {
+        exit(2);
+    }
 }

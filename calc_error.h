@@ -16,8 +16,6 @@
 #define ABS_ERR_UPPER_BOUND_VAL     0.02
 #define IGNORE_VAL_FLAG             -999
 
-#define SUB_ABS(lhs, rhs) ((lhs > rhs) ? (lhs - rhs) : (rhs - lhs))
-
 void check_error_gpu(double *array, float *array_rp, int N);
 unsigned long long get_dmr_error();
 

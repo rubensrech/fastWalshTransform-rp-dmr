@@ -11,6 +11,8 @@
 #include <cuda_runtime_api.h>
 #include <cublas_v2.h>
 
+#define SUB_ABS(lhs, rhs) ((lhs > rhs) ? (lhs - rhs) : (rhs - lhs))
+
 #define BLOCK_SIZE 32
 
 #define CHECK_CUDA_ERROR(ans) { checkCudaError((ans), __FILE__, __LINE__); }
