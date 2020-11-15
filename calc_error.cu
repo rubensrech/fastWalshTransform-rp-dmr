@@ -22,11 +22,7 @@ unsigned long long get_dmr_error() {
 
 __forceinline__  __device__ void relative_error(double val, float val_rp) {
     float relative = __fdividef(val_rp, float(val));
-    if (val == 0) {
-        if (val != val_rp) {
-            atomicAdd(&errors, 1);
-        }
-    } else if (relative < MIN_PERCENTAGE || relative > MAX_PERCENTAGE) {
+    if (relative < MIN_PERCENTAGE || relative > MAX_PERCENTAGE) {
         atomicAdd(&errors, 1);
     }
 }
@@ -68,7 +64,7 @@ __forceinline__  __device__ void hybrid_error(double val, float val_rp) {
     }
 }
 
-__global__ void check_error_kernel(double *array, float *array_rp, int N) {
+__global__ void check_errors_kernel(double *array, float *array_rp, int N) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < N)
 #if ERROR_METRIC == HYBRID
@@ -80,9 +76,9 @@ __global__ void check_error_kernel(double *array, float *array_rp, int N) {
 #endif
 }
 
-void check_error_gpu(double *array, float *array_rp, int N) {
+void check_errors_gpu(double *array, float *array_rp, int N) {
     int gridDim = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    check_error_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, N);
+    check_errors_kernel<<<gridDim, BLOCK_SIZE>>>(array, array_rp, N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
 

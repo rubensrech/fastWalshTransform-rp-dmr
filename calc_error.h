@@ -5,13 +5,13 @@
 #define UINT_ERROR   1
 #define HYBRID       2
 
-#define MIN_PERCENTAGE 0.82f
-#define MAX_PERCENTAGE 1.18f
+#define ABS_ERR_THRESHOLD   0.000031f // Max ABS error(input-bit-21.data) = 0.000031
+#define REL_ERR_THRESHOLD   0.000001f // Max REL error(input-bit-21.data) = 0.000001
 
-#define UINT_THRESHOLD      0
+#define MIN_PERCENTAGE 1.0f - REL_ERR_THRESHOLD
+#define MAX_PERCENTAGE 1.0f + REL_ERR_THRESHOLD
 
-#define ABS_ERR_THRESHOLD   0.0003200 // Max ABS error(input-bit-21.data) = 0.000315
-#define REL_ERR_THRESHOLD   0.004850f // Max REL error(input-bit-21.data) = 0.004843
+#define UINT_THRESHOLD      9
 
 #define ABS_ERR_UPPER_BOUND_VAL     0.02
 #define IGNORE_VAL_FLAG             -999
@@ -21,7 +21,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 unsigned long long get_dmr_error();
-void check_error_gpu(double *array, float *array_rp, int N);
+void check_errors_gpu(double *array, float *array_rp, int N);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Find max error functions

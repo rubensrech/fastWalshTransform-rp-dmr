@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Running Fast Walsh Transform on device
 
-    cudaEventRecord(startStream1, stream1);
+    // cudaEventRecord(startStream1, stream1);
     
     // Full-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
@@ -205,9 +205,9 @@ int main(int argc, char *argv[]) {
     cudaEventRecord(stopStream1, stream1);
     cudaEventSynchronize(stopStream1);
 
-    float msStream1 = 0;
-    cudaEventElapsedTime(&msStream1, startStream1, stopStream1);
-    printf("Kernels elapsed time: %3.3lf ms\n", msStream1);
+    // float msStream1 = 0;
+    // cudaEventElapsedTime(&msStream1, startStream1, stopStream1);
+    // printf("Kernels elapsed time: %3.3lf ms\n", msStream1);
     
     // ====================================================
     // > Reading back device results
@@ -284,7 +284,9 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Checking for faults
 
-    printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (UINT_ERROR ? "UINT Error" : "Relative Error"));
+    check_errors_gpu(d_Data, d_Data_rp, dataN);
+
+    printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error"));
 
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
