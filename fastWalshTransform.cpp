@@ -158,10 +158,6 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
-    // Reduced-precision
-    CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel_rp, 0, DATA_SIZE_RP, stream1));
-    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel_rp, h_Kernel_rp, KERNEL_SIZE_RP, cudaMemcpyHostToDevice, stream1));
-    CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data_rp, h_Data_rp, DATA_SIZE_RP, cudaMemcpyHostToDevice, stream1));
 
     cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
@@ -308,6 +304,10 @@ int main(int argc, char *argv[]) {
     if (measureTime) {
         getTimeNow(&t1);
         printf("> Total execution time: %.3lf ms\n", elapsedTime(t0, t1));
+    }
+
+    if (faultDetected) {
+        exit(2);
     }
 
 }
