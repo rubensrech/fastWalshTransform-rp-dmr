@@ -234,23 +234,4 @@ void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream) {
     modulateKernel<<<128, 256, 0, stream>>>(d_A, d_B, N);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Calculate output relative error
-////////////////////////////////////////////////////////////////////////////////
-__forceinline__  __device__ float relative_error(double rhs, float lhs) {
-	return __fdividef(lhs, float(rhs));
-}
-
-__global__ void relative_error_kernel(double *output, float *output_rp, float *err_output, int N) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < N)
-        err_output[tid] = relative_error(output[tid], output_rp[tid]);
-}
-
-void relative_error_gpu(double *output, float *output_rp, float *err_output, int N) {
-    int blockSize = 32;
-    int gridDim = (N + blockSize - 1) / blockSize;
-    relative_error_kernel<<<gridDim, blockSize>>>(output, output_rp, err_output, N);
-}
-
 #endif

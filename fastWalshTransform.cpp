@@ -67,40 +67,6 @@ void fwtCPU(double *h_Output, double *h_Input, int log2N){
     }
 }
 
-void slowWTcpu(double *h_Output, double *h_Input, int log2N){
-    const int N = 1 << log2N;
-
-    for(int i = 0; i < N; i++){
-        double sum = 0;
-
-        for(int j = 0; j < N; j++){
-            //Walsh-Hadamar quotent
-            double q = 1.0;
-            for(int t = i & j; t != 0; t >>= 1)
-                if(t & 1) q = -q;
-
-            sum += q * h_Input[j];
-        }
-
-        h_Output[i] = (double)sum;
-    }
-}
-
-void dyadicConvolutionCPU(double *h_Result, double *h_Data, double *h_Kernel, int log2dataN, int log2kernelN) {
-    const int   dataN = 1 << log2dataN;
-    const int kernelN = 1 << log2kernelN;
-
-    for(int i = 0; i < dataN; i++){
-        double sum = 0;
-
-        for(int j = 0; j < kernelN; j++)
-            sum += h_Data[i ^ j] * h_Kernel[j];
-
-        h_Result[i] = (double)sum;
-    }
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // GPU FWT
 ////////////////////////////////////////////////////////////////////////////////
