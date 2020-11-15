@@ -35,47 +35,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
-#include <time.h>
-#include <sys/time.h>
+#include <regex>
+#include <bitset>
+#include <iostream>
 
 #include "util.h"
-
-////////////////////////////////////////////////////////////////////////////////
-// CPU FWT
-////////////////////////////////////////////////////////////////////////////////
-void fwtCPU(double *h_Output, double *h_Input, int log2N){
-    const int N = 1 << log2N;
-
-    for(int pos = 0; pos < N; pos++)
-        h_Output[pos] = h_Input[pos];
-
-    //Cycle through stages with different butterfly strides
-    for(int stride = N / 2; stride >= 1; stride >>= 1){
-        //Cycle through subvectors of (2 * stride) elements
-        for(int base = 0; base < N; base += 2 * stride)
-            //Butterfly index within subvector of (2 * stride) size
-            for(int j = 0; j < stride; j++){
-                int i0 = base + j +      0;
-                int i1 = base + j + stride;
-
-                double T1 = h_Output[i0];
-                double T2 = h_Output[i1];
-                h_Output[i0] = T1 + T2;
-                h_Output[i1] = T1 - T2;
-            }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// GPU FWT
-////////////////////////////////////////////////////////////////////////////////
-extern void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream);
-extern void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream);
-extern void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream);
-extern void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream);
-
-extern void relative_error_gpu(double *output, float *output_rp, float *err_output, int N);
+#include "fwtCPU.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Data configuration
@@ -96,48 +63,70 @@ const int KERNEL_SIZE = kernelN * sizeof(double);
 const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Timing functions
+// GPU FWT
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct timeval Time;
+#include "calc_error.h"
 
-void getTimeNow(Time *t) {
-    gettimeofday(t, 0);
-}
+extern void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream);
+extern void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream);
+extern void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream);
+extern void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream);
 
-double elapsedTime(Time t1, Time t2) {
-    return (1000000.0*(t2.tv_sec-t1.tv_sec) + t2.tv_usec-t1.tv_usec)/1000.0;
-}
+extern void relative_error_gpu(double *output, float *output_rp, float *err_output, int N);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
-    // Host data
-    double *h_Data, *h_Kernel, *h_ResultCPU, *h_ResultGPU;
+    // ====================================================
+    // > Managing arguments
+    // * Load Input
+    char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
+    bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
+    // * Save input
+    bool saveInput = find_int_arg(argc, argv, (char*)"-saveInput", 0);
+    // * Save input UINT thresh
+    int saveInputBitThresh = find_int_arg(argc, argv, (char*)"-saveInputBitThresh", 0);
+    // * Save output
+    bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
+    // * Validate output
+    bool validateOutput = find_int_arg(argc, argv, (char*)"-validateOutput", 0);
+    // * Measure time
+    bool measureTime = find_int_arg(argc, argv, (char*)"-measureTime", 0);
+
+    // ====================================================
+    // > Declaring variables
+    // * Host data
+    //      - Full-precision
+    double *h_Data, *h_Kernel, *h_ResultGPU;
+    //      - Reduced-precision
     float *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
+    //      - Extra
     float *h_Error;
 
-    // Device data
+    // * Device data
+    //      - Full-precision
     double *d_Data, *d_Kernel;
+    //      - Reduced-precision
     float *d_Data_rp, *d_Kernel_rp;
+    //      - Extra
     float *d_Error;
     cudaStream_t stream1;
     cudaEvent_t startStream1, stopStream1;
 
+    // * CPU version
+    double *h_ResultCPU;
     double delta, ref, sum_delta2, sum_ref2, L2norm;
-    Time t1, t2;
+    Time t0;
     int i;
 
-    // ==========================================================================
-    // ==========================================================================
-    printf("1) Initializing data\n");
+    if (measureTime) getTimeNow(&t0);
+
+    // ====================================================
+    // > Allocating CPU memory
 
     cudaEventCreate(&startStream1);
     cudaEventCreate(&stopStream1);
-
-    // ====================================================
-    printf("    1.1) Allocating CPU memory... ");
-    getTimeNow(&t1);
 
     // Full-precision
     h_Kernel    = (double*)malloc(KERNEL_SIZE);
@@ -151,13 +140,8 @@ int main(int argc, char *argv[]) {
     // Error calculation
     h_Error = (float*)malloc(DATA_SIZE_RP);
 
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-    
-
     // ====================================================
-    printf("    1.2) Allocating GPU memory... ");
-    getTimeNow(&t1);
+    // > Allocating GPU memory
 
     CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&stream1, cudaStreamNonBlocking));
     // Full-precision
@@ -169,29 +153,26 @@ int main(int argc, char *argv[]) {
     // Error calculation
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Error,   DATA_SIZE_RP));
 
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
     // ====================================================
-    printf("    1.3) Generating data (host)... ");
-    getTimeNow(&t1);
+    // > Generating/Loading input data
 
-    srand((int)time(NULL));
-    for (i = 0; i < kernelN; i++) {
-        h_Kernel[i] = (double)rand() / (double)RAND_MAX;
-        h_Kernel_rp[i] = h_Kernel[i];
-    }
-    for (i = 0; i < dataN; i++) {
-        h_Data[i] = (double)rand() / (double)RAND_MAX;
-        h_Data_rp[i] = h_Data[i];
+    if (loadInput) {
+        // > Loading input data
+        load_input(input_filename, h_Data, dataN, h_Kernel, kernelN);
+    } else {
+        // > Generating input data
+        srand((int)time(NULL));
+        for (i = 0; i < kernelN; i++) h_Kernel[i] = (double)rand() / (double)RAND_MAX;
+        for (i = 0; i < dataN; i++) h_Data[i] = (double)rand() / (double)RAND_MAX;
     }
 
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
+    // ====================================================
+    // > Duplicating input
+    for (i = 0; i < kernelN; i++)   h_Kernel_rp[i] = h_Kernel[i];
+    for (i = 0; i < dataN; i++)     h_Data_rp[i] = h_Data[i];
 
     // ====================================================
-    printf("    1.4) Copying data to device... ");
-    getTimeNow(&t1);
+    // > Copying data to device
 
     // Full-precision    
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
@@ -204,12 +185,10 @@ int main(int argc, char *argv[]) {
 
     cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
 
     // ====================================================
-    printf("2) Running dyadic convolution using Fast Walsh Transform on device... ");
+    // > Running Fast Walsh Transform on device
+
     cudaEventRecord(startStream1, stream1);
     
     // Full-precision
@@ -231,8 +210,7 @@ int main(int argc, char *argv[]) {
     printf("(%3.3lf ms) \n", msStream1);
     
     // ====================================================
-    printf("    2.1) Reading back device results... ");
-    getTimeNow(&t1);
+    // > Reading back device results
 
     // Full-precision
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
@@ -241,61 +219,101 @@ int main(int argc, char *argv[]) {
 
     cudaStreamSynchronize(stream1);
 
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
     // ====================================================
-    printf("3) Running straightforard CPU dyadic convolution... ");
-    getTimeNow(&t1);
-
-    dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
-    // ====================================================
-    printf("4) Comparing the results... ");
-    getTimeNow(&t1);
-
-    sum_delta2 = 0;
-    sum_ref2   = 0;
-    for (i = 0; i < dataN; i++) {
-        delta       = h_ResultCPU[i] - h_ResultGPU[i];
-        ref         = h_ResultCPU[i];
-        sum_delta2 += delta * delta;
-        sum_ref2   += ref * ref;
+    // > Validating output
+    if (validateOutput) {
+        validateGPUOutput(h_Data, h_Kernel, log2Data, log2Kernel, h_ResultGPU);
     }
-    L2norm = sqrt(sum_delta2 / sum_ref2);
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
-    printf("    L2 norm: %E\n", L2norm);
-    printf((L2norm < 1e-6) ? "    TEST PASSED\n" : "    TEST FAILED\n");
 
     // ====================================================
-    printf("5) Comparing Double VS Float... ");
-    getTimeNow(&t1);
+    // > Saving input
+    unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
+    int maxErrorBit = log2_host(maxUINTError);
+    unsigned int UINTThresh = 1 << saveInputBitThresh;
+    bool inputSaved = false;
+    if (saveInput && maxUINTError <= UINTThresh) {
+        if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
+            fprintf(stderr, "ERROR: could not save input\n");
+        } else {
+            inputSaved = true;
+        }
+    }
 
-    // Relative error
-    relative_error_gpu(d_Data, d_Data_rp, d_Error, dataN);
-    cudaMemcpy(h_Error, d_Error, DATA_SIZE_RP, cudaMemcpyDeviceToHost);    
-    int iMaxRelErr = 0;
-    for (i = 0; i < dataN; i++) if (h_Error[i] > h_Error[iMaxRelErr]) iMaxRelErr = i;
-    // Absolute error
-    for (i = 0; i < dataN; i++) h_Error[i] = abs(h_ResultGPU[i] - h_ResultGPU_rp[i]);
-    int iMaxAbsErr = 0;
-    for (i = 0; i < dataN; i++) if (h_Error[i] > h_Error[iMaxAbsErr]) iMaxAbsErr = i;
+    // ====================================================
+    // > Saving output
+    if (saveOutput) {
+        if (save_output(h_ResultGPU, dataN)) {
+            printf("OUTPUT SAVED SUCCESSFULY\n");
+        } else {
+            fprintf(stderr, "ERROR: could not save output\n");
+        }
+    }
+
+#ifdef FIND_THRESHOLD
+    // ====================================================
+    // > Finding UINT threshold
+
+    printf("FIND THRESHOLD: Unimplemented")
+
+#else
+    // ====================================================
+    // > Checking for faults
+
+    printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (UINT_ERROR ? "UINT Error" : "Relative Error"));
+
+    unsigned long long dmrErrors = get_dmr_error();
+    bool faultDetected = dmrErrors > 0;
+    printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
+
+    // ====================================================
+    // > Checking output against Golden output
+    std::string gold_output_filename(input_filename);
+    gold_output_filename = std::regex_replace(gold_output_filename, std::regex("input"), "output");
+    bool outputIsCorrect = compare_output_with_golden(h_ResultGPU, dataN, gold_output_filename.c_str());
+    printf("> Output corrupted? %s\n", !outputIsCorrect ? "YES" : "NO");
+
+    // ====================================================
+    // > Classifing
+    printf("> DMR classification: ");
+    if (faultDetected && outputIsCorrect) printf("FALSE POSITIVE\n");
+    if (faultDetected && !outputIsCorrect) printf("TRUE POSITIVE\n");
+    if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
+    if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
     
-
-    getTimeNow(&t2);
-    printf("(%3.3lf ms)\n", elapsedTime(t1, t2));
-
-    printf("    Max relative error: %f (%f x %f)\n", h_Error[iMaxRelErr], h_ResultCPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
-    printf("    Max absolute error: %f (%f x %f)\n", h_Error[iMaxAbsErr], h_ResultCPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+#endif
 
     // ====================================================
-    printf("6) Shutting down\n");
+    // > Comparing Double VS Float
+
+    int iMaxRelErr = -1, iMaxAbsErr = -1;
+    float maxRelErr = -999, maxAbsErr = -999;
+    int zeros = 0;
+    for (i = 0; i < dataN; i++) {
+        float lhs = h_ResultGPU_rp[i];
+        float rhs = float(h_ResultGPU[i]);
+        if (lhs == 0 || rhs == 0) zeros++;
+        float relErr = abs(1 - lhs / rhs);
+        float absErr = abs(lhs - rhs);
+        if (relErr > maxRelErr) { maxRelErr = relErr; iMaxRelErr = i; }
+        if (absErr > maxAbsErr) { maxAbsErr = absErr; maxAbsErr = i; }
+    }
+    
+    printf(" > Max relative error: %f (%f x %f)\n", maxRelErr, h_ResultGPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
+    printf(" > Max absolute error: %e (%e x %e)\n", maxAbsErr, h_ResultGPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+    printf(" > Zeros: %d\n", zeros);
+
+
+    /**
+     * TODO:
+     */
+
+    if (inputSaved) {
+        printf("\nINPUT SAVED SUCCESSFULLY! (Max error bit: %d)\n", maxErrorBit);
+        exit(5);
+    }
+
+    // ====================================================
+    // > Shutting down
     // Full-precision
     free(h_ResultGPU);
     free(h_ResultCPU);

@@ -1,3 +1,7 @@
+# ERROR_METRIC = uint_error | relative_error | hybrid
+ERROR_METRIC=hybrid
+FIND_THRESHOLD=0
+
 TARGET=fastWalshTransform
 SRC_DIR=.
 OBJ_DIR=./obj
@@ -24,10 +28,27 @@ CUO_FILES=$(addprefix $(OBJ_DIR)/,$(notdir $(CU_FILES:.cu=.o)))
 OBJS=$(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(CPP_FILES)))
 OBJS+=$(patsubst %.cu,$(OBJ_DIR)/%.cu.o,$(notdir $(CU_FILES)))
 
-all: mkdirobj $(TARGET)
+ifeq ($(ERROR_METRIC), relative_error) 
+CXXFLAGS+= -DERROR_METRIC=0
+NVCCFLAGS+= -DERROR_METRIC=0
+endif
 
-test:
-	echo $(OBJS)
+ifeq ($(ERROR_METRIC), uint_error) 
+CXXFLAGS+= -DERROR_METRIC=1
+NVCCFLAGS+= -DERROR_METRIC=1
+endif
+
+ifeq ($(ERROR_METRIC), hybrid) 
+CXXFLAGS+= -DERROR_METRIC=2
+NVCCFLAGS+= -DERROR_METRIC=2
+endif
+
+ifeq ($(FIND_THRESHOLD), 1) 
+CXXFLAGS+= -DFIND_THRESHOLD
+NVCCFLAGS+= -DFIND_THRESHOLD
+endif
+
+all: mkdirobj $(TARGET)
 
 mkdirobj:
 	mkdir -p $(OBJ_DIR)
@@ -44,3 +65,22 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(H_FILES)
 clean:
 	rm -rf $(OBJ_DIR)
 	rm $(TARGET)
+
+copy_titanV:
+	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr
+	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
+
+copy_nvbitfi_titanV:
+	# scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+	scp Makefile gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+
+copy_p100:
+	scp *.{cu,h,cpp} gppd:fastWalshTransform-dmr
+	scp Makefile gppd:fastWalshTransform-dmr
+
+test:
+	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1
+
+golden:
+	./fastWalshTransform -input inputs/input-bit-21.data > golden_stdout.txt 2> golden_stderr.txt
+	mv out-vs-gold-stats.txt golden_out-vs-gold-stats.txt
