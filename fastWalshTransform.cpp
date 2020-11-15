@@ -72,7 +72,7 @@ extern void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream);
 extern void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream);
 extern void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream);
 
-extern void relative_error_gpu(double *output, float *output_rp, float *err_output, int N);
+extern void duplicate_input_gpu(double *input, float *input_rp, int N);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
@@ -101,8 +101,6 @@ int main(int argc, char *argv[]) {
     double *h_Data, *h_Kernel, *h_ResultGPU;
     //      - Reduced-precision
     float *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
-    //      - Extra
-    float *h_Error;
 
     // * Device data
     //      - Full-precision
@@ -110,14 +108,9 @@ int main(int argc, char *argv[]) {
     //      - Reduced-precision
     float *d_Data_rp, *d_Kernel_rp;
     //      - Extra
-    float *d_Error;
     cudaStream_t stream1;
-    cudaEvent_t startStream1, stopStream1;
 
-    // * CPU version
-    double *h_ResultCPU;
-    double delta, ref, sum_delta2, sum_ref2, L2norm;
-    Time t0;
+    Time t0, t1;
     int i;
 
     if (measureTime) getTimeNow(&t0);
@@ -125,20 +118,14 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Allocating CPU memory
 
-    cudaEventCreate(&startStream1);
-    cudaEventCreate(&stopStream1);
-
     // Full-precision
     h_Kernel    = (double*)malloc(KERNEL_SIZE);
     h_Data      = (double*)malloc(DATA_SIZE);
-    h_ResultCPU = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
     // Reduced-precision
     h_Kernel_rp    = (float*)malloc(KERNEL_SIZE_RP);
     h_Data_rp      = (float*)malloc(DATA_SIZE_RP);
     h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
-    // Error calculation
-    h_Error = (float*)malloc(DATA_SIZE_RP);
 
     // ====================================================
     // > Allocating GPU memory
@@ -150,8 +137,6 @@ int main(int argc, char *argv[]) {
     // Reduced-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel_rp, DATA_SIZE_RP));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data_rp,   DATA_SIZE_RP));
-    // Error calculation
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Error,   DATA_SIZE_RP));
 
     // ====================================================
     // > Generating/Loading input data
@@ -165,11 +150,6 @@ int main(int argc, char *argv[]) {
         for (i = 0; i < kernelN; i++) h_Kernel[i] = (double)rand() / (double)RAND_MAX;
         for (i = 0; i < dataN; i++) h_Data[i] = (double)rand() / (double)RAND_MAX;
     }
-
-    // ====================================================
-    // > Duplicating input
-    for (i = 0; i < kernelN; i++)   h_Kernel_rp[i] = h_Kernel[i];
-    for (i = 0; i < dataN; i++)     h_Data_rp[i] = h_Data[i];
 
     // ====================================================
     // > Copying data to device
@@ -187,9 +167,12 @@ int main(int argc, char *argv[]) {
     cudaDeviceSynchronize();
 
     // ====================================================
-    // > Running Fast Walsh Transform on device
+    // > Duplicating input
+    duplicate_input_gpu(d_Kernel, d_Kernel_rp, kernelN);
+    duplicate_input_gpu(d_Data, d_Data_rp, dataN);
 
-    // cudaEventRecord(startStream1, stream1);
+    // ====================================================
+    // > Running Fast Walsh Transform on device
     
     // Full-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
@@ -201,13 +184,6 @@ int main(int argc, char *argv[]) {
     fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
     modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
     fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
-
-    cudaEventRecord(stopStream1, stream1);
-    cudaEventSynchronize(stopStream1);
-
-    // float msStream1 = 0;
-    // cudaEventElapsedTime(&msStream1, startStream1, stopStream1);
-    // printf("Kernels elapsed time: %3.3lf ms\n", msStream1);
     
     // ====================================================
     // > Reading back device results
@@ -318,7 +294,6 @@ int main(int argc, char *argv[]) {
     // > Shutting down
     // Full-precision
     free(h_ResultGPU);
-    free(h_ResultCPU);
     free(h_Data);
     free(h_Kernel);
     CHECK_CUDA_ERROR(cudaFree(d_Data));
@@ -329,6 +304,10 @@ int main(int argc, char *argv[]) {
     free(h_Kernel_rp);
     CHECK_CUDA_ERROR(cudaFree(d_Data_rp));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
-    // Error calculation
-    CHECK_CUDA_ERROR(cudaFree(d_Error));
+
+    if (measureTime) {
+        getTimeNow(&t1);
+        printf("> Total execution time: %.3lf ms\n", elapsedTime(t0, t1));
+    }
+
 }
