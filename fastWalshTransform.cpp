@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
 
     float msStream1 = 0;
     cudaEventElapsedTime(&msStream1, startStream1, stopStream1);
-    printf("(%3.3lf ms) \n", msStream1);
+    printf("Kernels elapsed time: %3.3lf ms\n", msStream1);
     
     // ====================================================
     // > Reading back device results
@@ -227,17 +227,20 @@ int main(int argc, char *argv[]) {
 
     // ====================================================
     // > Saving input
-    unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
-    int maxErrorBit = log2_host(maxUINTError);
-    unsigned int UINTThresh = 1 << saveInputBitThresh;
+
+    // unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
+    // int maxErrorBit = log2_host(maxUINTError);
+    // unsigned int UINTThresh = 1 << saveInputBitThresh;
+    // bool inputSaved = false;
+    // if (saveInput && maxUINTError <= UINTThresh) {
+    //     if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
+    //         fprintf(stderr, "ERROR: could not save input\n");
+    //     } else {
+    //         inputSaved = true;
+    //     }
+    // }
     bool inputSaved = false;
-    if (saveInput && maxUINTError <= UINTThresh) {
-        if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
-            fprintf(stderr, "ERROR: could not save input\n");
-        } else {
-            inputSaved = true;
-        }
-    }
+    int maxErrorBit = -1;
 
     // ====================================================
     // > Saving output
@@ -251,9 +254,31 @@ int main(int argc, char *argv[]) {
 
 #ifdef FIND_THRESHOLD
     // ====================================================
-    // > Finding UINT threshold
+    // > Finding thresholds
 
-    printf("FIND THRESHOLD: Unimplemented")
+    float *relErrArr = (float*)calloc(sizeof(float), dataN);
+    float *absErrArr = (float*)calloc(sizeof(float), dataN);
+
+    calc_errors_gpu(d_Data, d_Data_rp, dataN);
+
+    get_rel_error_array(relErrArr, dataN);
+    get_abs_error_array(absErrArr, dataN);
+
+    int ignoreRelErrCount = 0;
+    int iMaxRelErr = find_max_i(relErrArr, dataN);
+    int iMaxAbsErr = find_max_i(absErrArr, dataN);
+
+    for (i = 0; i < dataN; i++) if (relErrArr[i] == IGNORE_VAL_FLAG) ignoreRelErrCount++;
+
+    printf("> MAX ERRORS\n");
+    std::cout << "    UINT error:  " << std::bitset<32>(get_max_uint_err()) << std::endl;
+    printf("    RELATIVE error:  %f (%e X %e) - ignored vals: %d\n", relErrArr[iMaxRelErr], h_ResultGPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr], ignoreRelErrCount);
+    printf("    ABSOLUTE error:  %f (%e X %e)\n", absErrArr[iMaxAbsErr], h_ResultGPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
+
+    printf("> GENERAL STATISTICS\n");
+    printf("    Zeros FP64: %u\n", get_zeros_fp64());
+    printf("    Zeros FP32: %u\n", get_zeros_fp32());
+    printf("    Negatives: %u\n", get_negatives());
 
 #else
     // ====================================================
@@ -281,31 +306,6 @@ int main(int argc, char *argv[]) {
     if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
     
 #endif
-
-    // ====================================================
-    // > Comparing Double VS Float
-
-    int iMaxRelErr = -1, iMaxAbsErr = -1;
-    float maxRelErr = -999, maxAbsErr = -999;
-    int zeros = 0;
-    for (i = 0; i < dataN; i++) {
-        float lhs = h_ResultGPU_rp[i];
-        float rhs = float(h_ResultGPU[i]);
-        if (lhs == 0 || rhs == 0) zeros++;
-        float relErr = abs(1 - lhs / rhs);
-        float absErr = abs(lhs - rhs);
-        if (relErr > maxRelErr) { maxRelErr = relErr; iMaxRelErr = i; }
-        if (absErr > maxAbsErr) { maxAbsErr = absErr; maxAbsErr = i; }
-    }
-    
-    printf(" > Max relative error: %f (%f x %f)\n", maxRelErr, h_ResultGPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr]);
-    printf(" > Max absolute error: %e (%e x %e)\n", maxAbsErr, h_ResultGPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
-    printf(" > Zeros: %d\n", zeros);
-
-
-    /**
-     * TODO:
-     */
 
     if (inputSaved) {
         printf("\nINPUT SAVED SUCCESSFULLY! (Max error bit: %d)\n", maxErrorBit);

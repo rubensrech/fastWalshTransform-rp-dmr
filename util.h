@@ -28,8 +28,6 @@ typedef struct timeval Time;
 void getTimeNow(Time *t);
 double elapsedTime(Time t1, Time t2);
 
-void printbits(unsigned int v);
-
 unsigned int log2_host(unsigned int n);
 
 int find_int_arg(int argc, char **argv, char *arg, int def);

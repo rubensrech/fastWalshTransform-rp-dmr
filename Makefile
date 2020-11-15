@@ -76,7 +76,7 @@ copy_nvbitfi_titanV:
 
 copy_p100:
 	scp *.{cu,h,cpp} gppd:fastWalshTransform-dmr
-	scp Makefile gppd:fastWalshTransform-dmr
+	# scp Makefile gppd:fastWalshTransform-dmr
 
 test:
 	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1
