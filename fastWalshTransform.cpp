@@ -109,6 +109,7 @@ int main(int argc, char *argv[]) {
     float *d_Data_rp, *d_Kernel_rp;
     //      - Extra
     cudaStream_t stream1;
+    cudaEvent_t start, stop;
 
     Time t0, t1;
     int i;
@@ -154,21 +155,53 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Copying data to device
 
+    float memCpyToDeviceMs;
+    if (measureTime) {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+    }
+
     // Full-precision    
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
+
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&memCpyToDeviceMs, start, stop);
+        printf("%s* FP64 data to device time: %f ms%s\n", GREEN, memCpyToDeviceMs, DFT_COLOR);
+    }
 
     cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
 
     // ====================================================
     // > Duplicating input
+
+    float inputDuplicationTimeMs;
+    if (measureTime) {
+        cudaEventRecord(start, 0);
+    }
+
     duplicate_input_gpu(d_Kernel, d_Kernel_rp, kernelN);
     duplicate_input_gpu(d_Data, d_Data_rp, dataN);
 
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&inputDuplicationTimeMs, start, stop);
+        printf("%s* Input duplication time: %f ms%s\n", GREEN, inputDuplicationTimeMs, DFT_COLOR);
+    }
+
     // ====================================================
     // > Running Fast Walsh Transform on device
+
+    float kernelsTimeMs;
+    if (measureTime) {
+        cudaEventRecord(start, 0);
+    }
     
     // Full-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
@@ -180,15 +213,22 @@ int main(int argc, char *argv[]) {
     fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
     modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
     fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
+
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&kernelsTimeMs, start, stop);
+        printf("%s* Kernels time: %f ms%s\n", GREEN, kernelsTimeMs, DFT_COLOR);
+
+        float dmrTotalTimeMs = memCpyToDeviceMs + inputDuplicationTimeMs + kernelsTimeMs;
+        printf("%s* Total DMR time: %f ms%s\n", GREEN, dmrTotalTimeMs, DFT_COLOR);
+    }
     
     // ====================================================
     // > Reading back device results
 
     // Full-precision
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
-    // Reduced-precision
-    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
-
     cudaStreamSynchronize(stream1);
 
     // ====================================================
@@ -241,6 +281,11 @@ int main(int argc, char *argv[]) {
     int iMaxAbsErr = find_max_i(absErrArr, dataN);
 
     for (i = 0; i < dataN; i++) if (relErrArr[i] == IGNORE_VAL_FLAG) ignoreRelErrCount++;
+
+    // > Reading back device results
+    // Reduced-precision
+    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
+    cudaStreamSynchronize(stream1);
 
     printf("> MAX ERRORS\n");
     std::cout << "    UINT error:  " << std::bitset<32>(get_max_uint_err()) << std::endl;
@@ -303,7 +348,7 @@ int main(int argc, char *argv[]) {
 
     if (measureTime) {
         getTimeNow(&t1);
-        printf("> Total execution time: %.3lf ms\n", elapsedTime(t0, t1));
+        printf("%s* Total execution time: %.3lf ms%s\n", GREEN, elapsedTime(t0, t1), DFT_COLOR);
     }
 
     if (faultDetected) {

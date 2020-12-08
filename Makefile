@@ -1,5 +1,5 @@
 # ERROR_METRIC = uint_error | relative_error | hybrid
-ERROR_METRIC=hybrid
+ERROR_METRIC=uint_error
 FIND_THRESHOLD=0
 
 TARGET=fastWalshTransform
@@ -71,12 +71,11 @@ copy_titanV:
 	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
-	# scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
 	scp Makefile gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
 
 copy_p100:
-	scp *.{cu,h,cpp} gppd:fastWalshTransform-dmr
-	# scp Makefile gppd:fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' ./ gppd:fastWalshTransform-dmr
 
 test:
 	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1
