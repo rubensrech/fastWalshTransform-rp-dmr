@@ -155,6 +155,7 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
+    cudaStreamSynchronize(stream1);
 
     if (measureTime) {
         cudaEventRecord(stop, 0);
@@ -163,7 +164,6 @@ int main(int argc, char *argv[]) {
         printf("%s* MemCpy to device time: %f ms%s\n", GREEN, memCpyToDeviceMs, DFT_COLOR);
     }
 
-    cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
 
     // ====================================================
