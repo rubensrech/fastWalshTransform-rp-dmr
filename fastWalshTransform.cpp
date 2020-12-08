@@ -99,14 +99,10 @@ int main(int argc, char *argv[]) {
     // * Host data
     //      - Full-precision
     double *h_Data, *h_Kernel, *h_ResultGPU;
-    //      - Reduced-precision
-    float *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
 
     // * Device data
     //      - Full-precision
     double *d_Data, *d_Kernel;
-    //      - Reduced-precision
-    float *d_Data_rp, *d_Kernel_rp;
     //      - Extra
     cudaStream_t stream1;
     cudaEvent_t start, stop;
@@ -123,10 +119,6 @@ int main(int argc, char *argv[]) {
     h_Kernel    = (double*)malloc(KERNEL_SIZE);
     h_Data      = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
-    // Reduced-precision
-    h_Kernel_rp    = (float*)malloc(KERNEL_SIZE_RP);
-    h_Data_rp      = (float*)malloc(DATA_SIZE_RP);
-    h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
 
     // ====================================================
     // > Allocating GPU memory
@@ -135,9 +127,6 @@ int main(int argc, char *argv[]) {
     // Full-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel, DATA_SIZE));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data,   DATA_SIZE));
-    // Reduced-precision
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel_rp, DATA_SIZE_RP));
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data_rp,   DATA_SIZE_RP));
 
     // ====================================================
     // > Generating/Loading input data
@@ -171,29 +160,11 @@ int main(int argc, char *argv[]) {
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&memCpyToDeviceMs, start, stop);
-        printf("%s* FP64 data to device time: %f ms%s\n", GREEN, memCpyToDeviceMs, DFT_COLOR);
+        printf("%s* MemCpy to device time: %f ms%s\n", GREEN, memCpyToDeviceMs, DFT_COLOR);
     }
 
     cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
-
-    // ====================================================
-    // > Duplicating input
-
-    float inputDuplicationTimeMs;
-    if (measureTime) {
-        cudaEventRecord(start, 0);
-    }
-
-    duplicate_input_gpu(d_Kernel, d_Kernel_rp, kernelN);
-    duplicate_input_gpu(d_Data, d_Data_rp, dataN);
-
-    if (measureTime) {
-        cudaEventRecord(stop, 0);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&inputDuplicationTimeMs, start, stop);
-        printf("%s* Input duplication time: %f ms%s\n", GREEN, inputDuplicationTimeMs, DFT_COLOR);
-    }
 
     // ====================================================
     // > Running Fast Walsh Transform on device
@@ -208,28 +179,35 @@ int main(int argc, char *argv[]) {
     fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
     modulateGPU(d_Data, d_Kernel, dataN, stream1);
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    // Reduced-precision
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
-    modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
 
     if (measureTime) {
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&kernelsTimeMs, start, stop);
         printf("%s* Kernels time: %f ms%s\n", GREEN, kernelsTimeMs, DFT_COLOR);
-
-        float dmrTotalTimeMs = memCpyToDeviceMs + inputDuplicationTimeMs + kernelsTimeMs;
-        printf("%s* Total DMR time: %f ms%s\n", GREEN, dmrTotalTimeMs, DFT_COLOR);
     }
     
     // ====================================================
     // > Reading back device results
 
+    float memCpyToHostTimeMs;
+    if (measureTime) {
+        cudaEventRecord(start, 0);
+    }
+
     // Full-precision
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
     cudaStreamSynchronize(stream1);
+
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&memCpyToHostTimeMs, start, stop);
+        printf("%s* MemCpy to host time: %f ms%s\n", GREEN, memCpyToHostTimeMs, DFT_COLOR);
+
+        float noDmrTotalTimeMs = memCpyToDeviceMs + kernelsTimeMs + memCpyToHostTimeMs;
+        printf("%s* NO-DMR total time: %f ms%s\n", GREEN, noDmrTotalTimeMs, DFT_COLOR);
+    }
 
     // ====================================================
     // > Validating output
@@ -240,9 +218,6 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Saving input
 
-    // unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
-    // int maxErrorBit = log2_host(maxUINTError);
-    // unsigned int UINTThresh = 1 << saveInputBitThresh;
     // bool inputSaved = false;
     // if (saveInput && maxUINTError <= UINTThresh) {
     //     if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
@@ -252,7 +227,6 @@ int main(int argc, char *argv[]) {
     //     }
     // }
     bool inputSaved = false;
-    int maxErrorBit = -1;
 
     // ====================================================
     // > Saving output
@@ -264,70 +238,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-#ifdef FIND_THRESHOLD
-    // ====================================================
-    // > Finding thresholds
-
-    float *relErrArr = (float*)calloc(sizeof(float), dataN);
-    float *absErrArr = (float*)calloc(sizeof(float), dataN);
-
-    calc_errors_gpu(d_Data, d_Data_rp, dataN);
-
-    get_rel_error_array(relErrArr, dataN);
-    get_abs_error_array(absErrArr, dataN);
-
-    int ignoreRelErrCount = 0;
-    int iMaxRelErr = find_max_i(relErrArr, dataN);
-    int iMaxAbsErr = find_max_i(absErrArr, dataN);
-
-    for (i = 0; i < dataN; i++) if (relErrArr[i] == IGNORE_VAL_FLAG) ignoreRelErrCount++;
-
-    // > Reading back device results
-    // Reduced-precision
-    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
-    cudaStreamSynchronize(stream1);
-
-    printf("> MAX ERRORS\n");
-    std::cout << "    UINT error:  " << std::bitset<32>(get_max_uint_err()) << std::endl;
-    printf("    RELATIVE error:  %f (%e X %e) - ignored vals: %d\n", relErrArr[iMaxRelErr], h_ResultGPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr], ignoreRelErrCount);
-    printf("    ABSOLUTE error:  %f (%e X %e)\n", absErrArr[iMaxAbsErr], h_ResultGPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
-
-    printf("> GENERAL STATISTICS\n");
-    printf("    Zeros FP64: %u\n", get_zeros_fp64());
-    printf("    Zeros FP32: %u\n", get_zeros_fp32());
-    printf("    Negatives: %u\n", get_negatives());
-
-#else
-    // ====================================================
-    // > Checking for faults
-
-    check_errors_gpu(d_Data, d_Data_rp, dataN);
-
-    printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error"));
-
-    unsigned long long dmrErrors = get_dmr_error();
-    bool faultDetected = dmrErrors > 0;
-    printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
-
-    // ====================================================
-    // > Checking output against Golden output
-    std::string gold_output_filename(input_filename);
-    gold_output_filename = std::regex_replace(gold_output_filename, std::regex("input"), "output");
-    bool outputIsCorrect = compare_output_with_golden(h_ResultGPU, dataN, gold_output_filename.c_str());
-    printf("> Output corrupted? %s\n", !outputIsCorrect ? "YES" : "NO");
-
-    // ====================================================
-    // > Classifing
-    printf("> DMR classification: ");
-    if (faultDetected && outputIsCorrect) printf("FALSE POSITIVE\n");
-    if (faultDetected && !outputIsCorrect) printf("TRUE POSITIVE\n");
-    if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
-    if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
-    
-#endif
-
     if (inputSaved) {
-        printf("\nINPUT SAVED SUCCESSFULLY! (Max error bit: %d)\n", maxErrorBit);
+        printf("\nINPUT SAVED SUCCESSFULLY!\n");
         exit(5);
     }
 
@@ -339,20 +251,10 @@ int main(int argc, char *argv[]) {
     free(h_Kernel);
     CHECK_CUDA_ERROR(cudaFree(d_Data));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel));
-    // Reduced-precision
-    free(h_ResultGPU_rp);
-    free(h_Data_rp);
-    free(h_Kernel_rp);
-    CHECK_CUDA_ERROR(cudaFree(d_Data_rp));
-    CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
 
     if (measureTime) {
         getTimeNow(&t1);
         printf("%s* Total execution time: %.3lf ms%s\n", GREEN, elapsedTime(t0, t1), DFT_COLOR);
-    }
-
-    if (faultDetected) {
-        exit(2);
     }
 
 }
