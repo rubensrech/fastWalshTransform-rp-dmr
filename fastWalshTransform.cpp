@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Copying data to device
 
-    float memCpyToDeviceMs;
+    float memCpyToDeviceTimeMs;
     if (measureTime) {
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
@@ -166,15 +166,15 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemsetAsync(d_Kernel, 0, DATA_SIZE, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice, stream1));
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
+    cudaStreamSynchronize(stream1);
 
     if (measureTime) {
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&memCpyToDeviceMs, start, stop);
-        printf("%s* FP64 data to device time: %f ms%s\n", GREEN, memCpyToDeviceMs, DFT_COLOR);
+        cudaEventElapsedTime(&memCpyToDeviceTimeMs, start, stop);
+        printf("%s* MemCpy to device time: %f ms%s\n", GREEN, memCpyToDeviceTimeMs, DFT_COLOR);
     }
 
-    cudaStreamSynchronize(stream1);
     cudaDeviceSynchronize();
 
     // ====================================================
@@ -219,17 +219,26 @@ int main(int argc, char *argv[]) {
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&kernelsTimeMs, start, stop);
         printf("%s* Kernels time: %f ms%s\n", GREEN, kernelsTimeMs, DFT_COLOR);
-
-        float dmrTotalTimeMs = memCpyToDeviceMs + inputDuplicationTimeMs + kernelsTimeMs;
-        printf("%s* Total DMR time: %f ms%s\n", GREEN, dmrTotalTimeMs, DFT_COLOR);
     }
     
     // ====================================================
     // > Reading back device results
 
+    float memCpyToHostTimeMs;
+    if (measureTime) {
+        cudaEventRecord(start, 0);
+    }
+
     // Full-precision
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
     cudaStreamSynchronize(stream1);
+
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&memCpyToHostTimeMs, start, stop);
+        printf("%s* MemCpy to host time: %f ms%s\n", GREEN, memCpyToHostTimeMs, DFT_COLOR);
+    }
 
     // ====================================================
     // > Validating output
@@ -301,7 +310,22 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Checking for faults
 
+    float checkFaultsTimeMs;
+    if (measureTime) {
+        cudaEventRecord(start, 0);
+    }
+
     check_errors_gpu(d_Data, d_Data_rp, dataN);
+
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&checkFaultsTimeMs, start, stop);
+        printf("%s* Check faults time: %f ms%s\n", GREEN, checkFaultsTimeMs, DFT_COLOR);
+
+        float dmrTotalTimeMs = memCpyToDeviceTimeMs + inputDuplicationTimeMs + kernelsTimeMs + memCpyToHostTimeMs + checkFaultsTimeMs;
+        printf("%s* Total DMR time: %f ms%s\n", GREEN, dmrTotalTimeMs, DFT_COLOR);
+    }
 
     printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error"));
 
