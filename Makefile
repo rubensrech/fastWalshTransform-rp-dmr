@@ -71,8 +71,7 @@ copy_titanV:
 	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
-	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
-	scp Makefile gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
+	rsync -av -e ssh --exclude='.git' ./ gpu_carol_titanV211:nvbitfi/test-apps/fastWalshTransform-dmr
 
 copy_p100:
 	rsync -av -e ssh --exclude='.git' ./ gppd:fastWalshTransform-dmr
