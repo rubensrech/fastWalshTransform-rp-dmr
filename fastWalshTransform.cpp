@@ -273,6 +273,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    bool faultDetected = false;
+    
 #ifdef FIND_THRESHOLD
     // ====================================================
     // > Finding thresholds
@@ -330,7 +332,7 @@ int main(int argc, char *argv[]) {
     printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error"));
 
     unsigned long long dmrErrors = get_dmr_error();
-    bool faultDetected = dmrErrors > 0;
+    faultDetected = dmrErrors > 0;
     printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
 
     // ====================================================
