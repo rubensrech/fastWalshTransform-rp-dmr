@@ -141,14 +141,17 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Generating/Loading input data
 
+    float input_range_min = 0;
+    float input_range_max = 1;
+
     if (loadInput) {
         // > Loading input data
         load_input(input_filename, h_Data, dataN, h_Kernel, kernelN);
     } else {
         // > Generating input data
         srand((int)time(NULL));
-        for (i = 0; i < kernelN; i++) h_Kernel[i] = (double)rand() / (double)RAND_MAX; 
-        for (i = 0; i < dataN; i++) h_Data[i] = (double)rand() / (double)RAND_MAX;
+        for (i = 0; i < kernelN; i++) h_Kernel[i] = ((double)rand()/(double)(RAND_MAX)) * input_range_max + input_range_min;
+        for (i = 0; i < dataN; i++) h_Data[i] = ((double)rand()/(double)(RAND_MAX)) * input_range_max + input_range_min;
     }
 
     // ====================================================
@@ -183,20 +186,6 @@ int main(int argc, char *argv[]) {
     if (validateOutput) {
         validateGPUOutput(h_Data, h_Kernel, log2Data, log2Kernel, h_ResultGPU);
     }
-
-    // ====================================================
-    // > Saving input
-    unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
-    int maxErrorBit = log2_host(maxUINTError);
-    unsigned int UINTThresh = 1 << saveInputBitThresh;
-    bool inputSaved = false;
-    if (saveInput && maxUINTError <= UINTThresh) {
-        if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
-            fprintf(stderr, "ERROR: could not save input\n");
-        } else {
-            inputSaved = true;
-        }
-    }
     
     // ====================================================
     // > Saving output
@@ -210,7 +199,12 @@ int main(int argc, char *argv[]) {
 
     // ====================================================
     // > Finding UINT threshold
+
+    unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
+
 #ifdef FIND_THRESHOLD
+
+    bool faultDetected = false;
 
 #if ERROR_METRIC == UINT_ERROR
 
@@ -273,6 +267,19 @@ int main(int argc, char *argv[]) {
     if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
     if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
 #endif
+
+    // ====================================================
+    // > Saving input
+    int maxErrorBit = log2_host(maxUINTError);
+    unsigned int UINTThresh = 1 << saveInputBitThresh;
+    bool inputSaved = false;
+    if (saveInput && maxUINTError <= UINTThresh && get_max_diff_zeros_double_val() == 0) {
+        if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
+            fprintf(stderr, "ERROR: could not save input\n");
+        } else {
+            inputSaved = true;
+        }
+    }
 
     if (inputSaved) {
         printf("\nINPUT SAVED SUCCESSFULLY! (Max error bit: %d)\n", maxErrorBit);
