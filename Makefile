@@ -67,8 +67,7 @@ clean:
 	rm $(TARGET)
 
 copy_titanV:
-	scp *.{cu,h,cpp} gpu_carol_titanV:rubens/fastWalshTransform-dmr
-	scp Makefile gpu_carol_titanV:rubens/fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' ./ gpu_carol_titanV211:fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
 	scp *.{cu,h,cpp,sh} gpu_carol_titanV:rubens/nvbitfi/test-apps/fastWalshTransform-dmr-rp
