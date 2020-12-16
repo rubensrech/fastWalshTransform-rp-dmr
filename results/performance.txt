@@ -1,0 +1,15 @@
+> NO-DMR
+    * MemCpy to device time: 23.397024 ms
+    * Kernels time: 11.895552 ms
+    * MemCpy to host time: 65.195778 ms
+    * NO-DMR total time: 100.488358 ms    
+
+> DMR-RP
+    * MemCpy to device time: 23.297920 ms
+    * Input duplication time: 0.974176 ms
+    * Kernels time: 18.008863 ms
+    * MemCpy to host time: 65.042435 ms
+    * Check faults time: 0.962752 ms
+    * Total DMR time: 108.286148 ms
+
+> OVERHEAD: 7.759894%
