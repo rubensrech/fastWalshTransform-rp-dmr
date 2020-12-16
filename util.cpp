@@ -172,6 +172,7 @@ bool compare_output_with_golden(double *output, int N, const char *filename) {
     bool outputsMatch = true;
     int countDiffs = 0;
     double minAbsErr = __DBL_MAX__, maxAbsErr = __DBL_MIN__, avgAbsErr = 0;
+    double minRelErr = __DBL_MAX__, maxRelErr = __DBL_MIN__, avgRelErr = 0;
     uint32_t bitErrs[64] = {0};
     for (i = 0; i < N; i++) {
         if (output[i] != gold_output[i]) {
@@ -189,12 +190,19 @@ bool compare_output_with_golden(double *output, int N, const char *filename) {
             if (absErr > maxAbsErr) maxAbsErr = absErr;
             if (absErr < minAbsErr) minAbsErr = absErr;
             avgAbsErr += absErr;
+            // Rel err
+            double relErr = abs(1 - output[i]/gold_output[i]);
+            if (relErr > maxRelErr) maxRelErr = relErr;
+            if (relErr < minRelErr) minRelErr = relErr;
+            avgRelErr += relErr;
         }
     }
     if (countDiffs > 0) {
         avgAbsErr /= countDiffs;
+        avgRelErr /= countDiffs;
     } else {
         avgAbsErr = minAbsErr = maxAbsErr = 0;
+        avgRelErr = minRelErr = maxRelErr = 0;
     }
     // Save stats to file
     FILE *fstats = fopen("out-vs-gold-stats.txt", "w");
@@ -207,6 +215,10 @@ bool compare_output_with_golden(double *output, int N, const char *filename) {
     fprintf(fstats, "  > Max absolute err: %.20e\n", maxAbsErr);
     fprintf(fstats, "  > Min absolute err: %.20e\n", minAbsErr);
     fprintf(fstats, "  > Avg absolute err: %.20e\n", avgAbsErr);
+    fprintf(fstats, "\n");
+    fprintf(fstats, "  > Max relative err: %.20e\n", maxRelErr);
+    fprintf(fstats, "  > Min relative err: %.20e\n", minRelErr);
+    fprintf(fstats, "  > Avg relative err: %.20e\n", avgRelErr);
     fprintf(fstats, "\n");
     fprintf(fstats, "  > Number of errors in each bit:\n");
     for (i = 0; i < 64; i++) {
