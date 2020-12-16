@@ -37,3 +37,4 @@ else
         echo "$class: $count"
     done
 
+fi
