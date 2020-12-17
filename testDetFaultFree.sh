@@ -1,3 +1,0 @@
-while ./fastWalshTransform -input inputs/input-bit-21.data ; [ $? -ne 2 ];do
-    echo ...
-done

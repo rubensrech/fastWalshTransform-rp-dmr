@@ -83,10 +83,6 @@ int main(int argc, char *argv[]) {
     // * Load Input
     char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
     bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
-    // * Save input
-    bool saveInput = find_int_arg(argc, argv, (char*)"-saveInput", 0);
-    // * Save input UINT thresh
-    int saveInputBitThresh = find_int_arg(argc, argv, (char*)"-saveInputBitThresh", 0);
     // * Save output
     bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
     // * Validate output
@@ -247,23 +243,6 @@ int main(int argc, char *argv[]) {
     }
 
     // ====================================================
-    // > Saving input
-
-    // unsigned int maxUINTError = std::max(get_max_uint_error_non_zeros(), get_max_uint_error_zeros());
-    // int maxErrorBit = log2_host(maxUINTError);
-    // unsigned int UINTThresh = 1 << saveInputBitThresh;
-    // bool inputSaved = false;
-    // if (saveInput && maxUINTError <= UINTThresh) {
-    //     if (!save_input(h_Data, dataN, h_Kernel, kernelN, maxErrorBit)) {
-    //         fprintf(stderr, "ERROR: could not save input\n");
-    //     } else {
-    //         inputSaved = true;
-    //     }
-    // }
-    bool inputSaved = false;
-    int maxErrorBit = -1;
-
-    // ====================================================
     // > Saving output
     if (saveOutput) {
         if (save_output(h_ResultGPU, dataN)) {
@@ -272,43 +251,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "ERROR: could not save output\n");
         }
     }
-
-    bool faultDetected = false;
     
-#ifdef FIND_THRESHOLD
-    // ====================================================
-    // > Finding thresholds
-
-    float *relErrArr = (float*)calloc(sizeof(float), dataN);
-    float *absErrArr = (float*)calloc(sizeof(float), dataN);
-
-    calc_errors_gpu(d_Data, d_Data_rp, dataN);
-
-    get_rel_error_array(relErrArr, dataN);
-    get_abs_error_array(absErrArr, dataN);
-
-    int ignoreRelErrCount = 0;
-    int iMaxRelErr = find_max_i(relErrArr, dataN);
-    int iMaxAbsErr = find_max_i(absErrArr, dataN);
-
-    for (i = 0; i < dataN; i++) if (relErrArr[i] == IGNORE_VAL_FLAG) ignoreRelErrCount++;
-
-    // > Reading back device results
-    // Reduced-precision
-    cudaMemcpyAsync(h_ResultGPU_rp, d_Data_rp, DATA_SIZE_RP, cudaMemcpyDeviceToHost, stream1);
-    cudaStreamSynchronize(stream1);
-
-    printf("> MAX ERRORS\n");
-    std::cout << "    UINT error:  " << std::bitset<32>(get_max_uint_err()) << std::endl;
-    printf("    RELATIVE error:  %f (%e X %e) - ignored vals: %d\n", relErrArr[iMaxRelErr], h_ResultGPU[iMaxRelErr], h_ResultGPU_rp[iMaxRelErr], ignoreRelErrCount);
-    printf("    ABSOLUTE error:  %f (%e X %e)\n", absErrArr[iMaxAbsErr], h_ResultGPU[iMaxAbsErr], h_ResultGPU_rp[iMaxAbsErr]);
-
-    printf("> GENERAL STATISTICS\n");
-    printf("    Zeros FP64: %u\n", get_zeros_fp64());
-    printf("    Zeros FP32: %u\n", get_zeros_fp32());
-    printf("    Negatives: %u\n", get_negatives());
-
-#else
     // ====================================================
     // > Checking for faults
 
@@ -329,33 +272,9 @@ int main(int argc, char *argv[]) {
         printf("%s* Total DMR time: %f ms%s\n", GREEN, dmrTotalTimeMs, DFT_COLOR);
     }
 
-    printf("> Error metric: %s\n", ERROR_METRIC == HYBRID ? "Hybrid (Rel + Abs)" : (ERROR_METRIC == UINT_ERROR ? "UINT Error" : "Relative Error"));
-
     unsigned long long dmrErrors = get_dmr_error();
-    faultDetected = dmrErrors > 0;
+    bool faultDetected = dmrErrors > 0;
     printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
-
-    // ====================================================
-    // > Checking output against Golden output
-    std::string gold_output_filename(input_filename);
-    gold_output_filename = std::regex_replace(gold_output_filename, std::regex("input"), "output");
-    bool outputIsCorrect = compare_output_with_golden(h_ResultGPU, dataN, gold_output_filename.c_str());
-    printf("> Output corrupted? %s\n", !outputIsCorrect ? "YES" : "NO");
-
-    // ====================================================
-    // > Classifing
-    printf("> DMR classification: ");
-    if (faultDetected && outputIsCorrect) printf("FALSE POSITIVE\n");
-    if (faultDetected && !outputIsCorrect) printf("TRUE POSITIVE\n");
-    if (!faultDetected && outputIsCorrect) printf("TRUE NEGATIVE\n");
-    if (!faultDetected && !outputIsCorrect) printf("FALSE NEGATIVE\n");
-    
-#endif
-
-    if (inputSaved) {
-        printf("\nINPUT SAVED SUCCESSFULLY! (Max error bit: %d)\n", maxErrorBit);
-        exit(5);
-    }
 
     // ====================================================
     // > Shutting down
@@ -381,4 +300,5 @@ int main(int argc, char *argv[]) {
         exit(2);
     }
 
+    return 0;
 }
