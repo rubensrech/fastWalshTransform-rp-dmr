@@ -79,7 +79,7 @@ copy_xavier:
 	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ nvidia@192.168.193.16:rubens/fastWalshTransform-dmr
 
 bring_results:
-	rsync -av -e ssh nvidia@192.168.193.16:rubens/fastWalshTransform-dmr/results ./results/	
+	rsync -v -e ssh nvidia@192.168.193.16:rubens/fastWalshTransform-dmr/results/ ./results
 
 test:
 	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1 -it 10

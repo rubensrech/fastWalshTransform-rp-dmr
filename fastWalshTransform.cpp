@@ -146,9 +146,6 @@ int main(int argc, char *argv[]) {
         for (i = 0; i < dataN; i++) h_Data[i] = (double)rand() / (double)RAND_MAX;
     }
 
-
-for (i = 0; i < iterations; i++) {
-
     // ====================================================
     // > Copying data to device
 
@@ -174,6 +171,7 @@ for (i = 0; i < iterations; i++) {
     // ====================================================
     // > Running Fast Walsh Transform on device
     
+for (i = 0; i < iterations; i++) {
     // Full-precision / Reduced-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
     fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
@@ -183,6 +181,7 @@ for (i = 0; i < iterations; i++) {
     modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
     fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);    
+}
     
     // ====================================================
     // > Reading back device results
@@ -201,14 +200,12 @@ for (i = 0; i < iterations; i++) {
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&totalTimeMs, start, stop);
-        printf("%s* Total CUDA event time: %f ms (it: %d)%s\n", GREEN, totalTimeMs, i, DFT_COLOR);
+        printf("%s* Total CUDA event time: %f ms %s\n", GREEN, totalTimeMs, DFT_COLOR);
     }
 
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
     // printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
-
-}
 
     // ====================================================
     // > Shutting down
