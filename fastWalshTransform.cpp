@@ -67,8 +67,7 @@ const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 ////////////////////////////////////////////////////////////////////////////////
 #include "calc_error.h"
 
-extern void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream);
-extern void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream);
+extern void fwtBatchGPU(double *data, float *data_rp, int M, int log2N, cudaStream_t stream);
 extern void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream);
 extern void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream);
 
@@ -203,16 +202,15 @@ int main(int argc, char *argv[]) {
         cudaEventRecord(start, 0);
     }
     
-    // Full-precision
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
+    // Full-precision / Reduced-precision
+    fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data, stream1);
+
+    fwtBatchGPU(d_Kernel, d_Kernel_rp, 1, log2Data, stream1);
+
     modulateGPU(d_Data, d_Kernel, dataN, stream1);
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    // Reduced-precision
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
     modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
+
+    fwtBatchGPU(d_Data, d_Data_rp, 1, log2Data, stream1);
 
     if (measureTime) {
         cudaEventRecord(stop, 0);

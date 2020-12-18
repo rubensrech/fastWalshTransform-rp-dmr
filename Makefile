@@ -67,13 +67,13 @@ clean:
 	rm $(TARGET)
 
 copy_titanV:
-	rsync -av -e ssh --exclude='.git' ./ gpu_carol_titanV211:fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ gpu_carol_titanV211:fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
-	rsync -av -e ssh --exclude='.git' ./ gpu_carol_titanV211:nvbitfi/test-apps/fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ gpu_carol_titanV211:nvbitfi/test-apps/fastWalshTransform-dmr
 
 copy_p100:
-	rsync -av -e ssh --exclude='.git' ./ gppd:fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ gppd:fastWalshTransform-dmr
 
 test:
 	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1

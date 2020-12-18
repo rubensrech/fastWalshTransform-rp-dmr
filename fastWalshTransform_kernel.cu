@@ -44,21 +44,26 @@
 ///////////////////////////////////////////////////////////////////////////////
 #define ELEMENTARY_LOG2SIZE 11
 
-__global__ void fwtBatch1Kernel(double *d_Output, double *d_Input, int log2N) {
+template<typename real_rp_t>
+__global__ void fwtBatch1Kernel(double *inOut, real_rp_t *inOut_rp, int log2N) {
     const int N = 1 << log2N;
     int stride = N;
     const int base = blockIdx.x << log2N;
 
     // (2 ** 11) * 4 bytes == 8KB -- maximum s_data[] size for G80
-    extern __shared__ double s_data[];
-    double *d_Src = d_Input  + base;
-    double *d_Dst = d_Output + base;
+    extern __shared__ char s_data[];
+    double *data = (double*)s_data;         real_rp_t *data_rp = (real_rp_t*)(s_data + N*sizeof(double));
 
-    for(int pos = threadIdx.x; pos < N; pos += blockDim.x)
-        s_data[pos] = d_Src[pos];
+    double *src = inOut + base;             real_rp_t *src_rp = inOut_rp + base;
+    double *dst = inOut + base;             real_rp_t *dst_rp = inOut_rp + base;  
+
+
+    for(int pos = threadIdx.x; pos < N; pos += blockDim.x) {
+        data[pos] = src[pos];               data_rp[pos] = src_rp[pos];
+    }
 
     //Do single radix-2 stage if for odd power
-    if(log2N & 1){
+    if (log2N & 1){
         __syncthreads();
         stride >>= 1;
         for(int pos = threadIdx.x; pos < N / 2; pos += blockDim.x){
@@ -66,10 +71,10 @@ __global__ void fwtBatch1Kernel(double *d_Output, double *d_Input, int log2N) {
             int i0 = ((pos - lo) << 1) + lo;
             int i1 = i0 + stride;
 
-            double t0 = s_data[i0];
-            double t1 = s_data[i1];
-            s_data[i0] = t0 + t1;
-            s_data[i1] = t0 - t1;
+            double t0 = data[i0];           real_rp_t t0_rp = data_rp[i0];
+            double t1 = data[i1];           real_rp_t t1_rp = data_rp[i1];
+            data[i0] = t0 + t1;             data_rp[i0] = t0_rp + t1_rp;
+            data[i1] = t0 - t1;             data_rp[i1] = t0_rp - t1_rp;
         }
     }
 
@@ -84,91 +89,41 @@ __global__ void fwtBatch1Kernel(double *d_Output, double *d_Input, int log2N) {
         int i2 = i1 + stride;
         int i3 = i2 + stride;
 
-        double d0 = s_data[i0];
-        double d1 = s_data[i1];
-        double d2 = s_data[i2];
-        double d3 = s_data[i3];
+        double d0 = data[i0];               real_rp_t d0_rp = data_rp[i0];
+        double d1 = data[i1];               real_rp_t d1_rp = data_rp[i1];
+        double d2 = data[i2];               real_rp_t d2_rp = data_rp[i2];
+        double d3 = data[i3];               real_rp_t d3_rp = data_rp[i3];
 
         double t;
-        t = d0; d0         = d0 + d2; d2         = t - d2;
-        t = d1; d1         = d1 + d3; d3         = t - d3;
-        t = d0; s_data[i0] = d0 + d1; s_data[i1] = t - d1;
-        t = d2; s_data[i2] = d2 + d3; s_data[i3] = t - d3;
+        t = d0;     d0       = d0 + d2;     d2       = t - d2;
+        t = d1;     d1       = d1 + d3;     d3       = t - d3;
+        t = d0;     data[i0] = d0 + d1;     data[i1] = t - d1;
+        t = d2;     data[i2] = d2 + d3;     data[i3] = t - d3;
+
+        real_rp_t t_rp;
+        t_rp = d0_rp;   d0_rp       = d0_rp + d2_rp;    d2_rp       = t_rp - d2_rp;
+        t_rp = d1_rp;   d1_rp       = d1_rp + d3_rp;    d3_rp       = t_rp - d3_rp;
+        t_rp = d0_rp;   data_rp[i0] = d0_rp + d1_rp;    data_rp[i1] = t_rp - d1_rp;
+        t_rp = d2_rp;   data_rp[i2] = d2_rp + d3_rp;    data_rp[i3] = t_rp - d3_rp;
     }
 
     __syncthreads();
-    for(int pos = threadIdx.x; pos < N; pos += blockDim.x)
-        d_Dst[pos] = s_data[pos];
-}
-
-__global__ void fwtBatch1Kernel(float *d_Output, float *d_Input, int log2N) {
-    const int N = 1 << log2N;
-    int stride = N;
-    const int base = blockIdx.x << log2N;
-
-    // (2 ** 11) * 4 bytes == 8KB -- maximum s_data[] size for G80
-    extern __shared__ float s_data_rp[];
-    float *d_Src = d_Input  + base;
-    float *d_Dst = d_Output + base;
-
-    for(int pos = threadIdx.x; pos < N; pos += blockDim.x)
-        s_data_rp[pos] = d_Src[pos];
-
-    //Do single radix-2 stage if for odd power
-    if(log2N & 1){
-        __syncthreads();
-        stride >>= 1;
-        for(int pos = threadIdx.x; pos < N / 2; pos += blockDim.x){
-            int lo = pos & (stride - 1);
-            int i0 = ((pos - lo) << 1) + lo;
-            int i1 = i0 + stride;
-
-            float t0 = s_data_rp[i0];
-            float t1 = s_data_rp[i1];
-            s_data_rp[i0] = t0 + t1;
-            s_data_rp[i1] = t0 - t1;
-        }
+    for(int pos = threadIdx.x; pos < N; pos += blockDim.x) {
+        dst[pos] = data[pos];               dst_rp[pos] = data_rp[pos];
     }
-
-    //Main radix4 stages
-    stride >>= 2;
-    int pos = threadIdx.x;
-    for(; stride >= 1; stride >>= 2){
-        __syncthreads();
-        int lo = pos & (stride - 1);
-        int i0 = ((pos - lo) << 2) + lo;
-        int i1 = i0 + stride;
-        int i2 = i1 + stride;
-        int i3 = i2 + stride;
-
-        float d0 = s_data_rp[i0];
-        float d1 = s_data_rp[i1];
-        float d2 = s_data_rp[i2];
-        float d3 = s_data_rp[i3];
-
-        float t;
-        t = d0; d0         = d0 + d2; d2         = t - d2;
-        t = d1; d1         = d1 + d3; d3         = t - d3;
-        t = d0; s_data_rp[i0] = d0 + d1; s_data_rp[i1] = t - d1;
-        t = d2; s_data_rp[i2] = d2 + d3; s_data_rp[i3] = t - d3;
-    }
-
-    __syncthreads();
-    for(int pos = threadIdx.x; pos < N; pos += blockDim.x)
-        d_Dst[pos] = s_data_rp[pos];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Single in-global memory radix-4 Fast Walsh Transform pass
 // (for strides exceeding elementary vector size)
 ////////////////////////////////////////////////////////////////////////////////
-template<typename real_t>
-__global__ void fwtBatch2Kernel(real_t *d_Output, real_t *d_Input, int stride) {
+template<typename real_rp_t>
+__global__ void fwtBatch2Kernel(double *inOut, real_rp_t *inOut_rp, int stride) {
     const int pos = blockIdx.x * blockDim.x + threadIdx.x;
     const int   N = blockDim.x *  gridDim.x * 4;
 
-    real_t *d_Src = d_Input  + blockIdx.y * N;
-    real_t *d_Dst = d_Output + blockIdx.y * N;
+    double *src = inOut + blockIdx.y * N;       real_rp_t *src_rp = inOut_rp + blockIdx.y * N;
+    double *dst = inOut + blockIdx.y * N;       real_rp_t *dst_rp = inOut_rp + blockIdx.y * N;
 
     int lo = pos & (stride - 1);
     int i0 = ((pos - lo) << 2) + lo;
@@ -176,40 +131,42 @@ __global__ void fwtBatch2Kernel(real_t *d_Output, real_t *d_Input, int stride) {
     int i2 = i1 + stride;
     int i3 = i2 + stride;
 
-    real_t d0 = d_Src[i0];
-    real_t d1 = d_Src[i1];
-    real_t d2 = d_Src[i2];
-    real_t d3 = d_Src[i3];
+    double d0 = src[i0];                      real_rp_t d0_rp = src_rp[i0];
+    double d1 = src[i1];                      real_rp_t d1_rp = src_rp[i1];
+    double d2 = src[i2];                      real_rp_t d2_rp = src_rp[i2];
+    double d3 = src[i3];                      real_rp_t d3_rp = src_rp[i3];
 
-    real_t t;
-    t = d0; d0        = d0 + d2; d2        = t - d2;
-    t = d1; d1        = d1 + d3; d3        = t - d3;
-    t = d0; d_Dst[i0] = d0 + d1; d_Dst[i1] = t - d1;
-    t = d2; d_Dst[i2] = d2 + d3; d_Dst[i3] = t - d3;
+    double t;
+    t = d0;     d0      = d0 + d2;      d2      = t - d2;
+    t = d1;     d1      = d1 + d3;      d3      = t - d3;
+    t = d0;     dst[i0] = d0 + d1;      dst[i1] = t - d1;
+    t = d2;     dst[i2] = d2 + d3;      dst[i3] = t - d3;
+
+    real_rp_t t_rp;
+    t_rp = d0_rp;   d0_rp      = d0_rp + d2_rp;     d2_rp      = t_rp - d2_rp;
+    t_rp = d1_rp;   d1_rp      = d1_rp + d3_rp;     d3_rp      = t_rp - d3_rp;
+    t_rp = d0_rp;   dst_rp[i0] = d0_rp + d1_rp;     dst_rp[i1] = t_rp - d1_rp;
+    t_rp = d2_rp;   dst_rp[i2] = d2_rp + d3_rp;     dst_rp[i3] = t_rp - d3_rp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Put everything together: batched Fast Walsh Transform CPU front-end
 ////////////////////////////////////////////////////////////////////////////////
-template<typename real_t>
-void fwtBatchGPUTemplate(real_t *d_Data, int M, int log2N, cudaStream_t stream) {
+template<typename real_t, typename real_rp_t>
+void fwtBatchGPUTemplate(real_t *data, real_rp_t *data_rp, int M, int log2N, cudaStream_t stream) {
     int N = 1 << log2N;
     dim3 grid((1 << log2N) / 1024, M, 1);
     for(; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2){
-        fwtBatch2Kernel<<<grid, 256, 0, stream>>>(d_Data, d_Data, N / 4);
+        fwtBatch2Kernel<<<grid, 256, 0, stream>>>(data, data_rp, N / 4);
         CHECK_CUDA_ERROR(cudaPeekAtLastError());
     }
 
-    fwtBatch1Kernel<<<M, N / 4, N * sizeof(real_t), stream>>>(d_Data, d_Data, log2N);
+    fwtBatch1Kernel<<<M, N / 4, N * sizeof(real_t) + N * sizeof(real_rp_t), stream>>>(data, data_rp, log2N);
     CHECK_CUDA_ERROR(cudaPeekAtLastError());
 }
 
-void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream) {
-    fwtBatchGPUTemplate(d_Data, M, log2N, stream);
-}
-
-void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream) {
-    fwtBatchGPUTemplate(d_Data, M, log2N, stream);
+void fwtBatchGPU(double *data, float *data_rp, int M, int log2N, cudaStream_t stream) {
+    fwtBatchGPUTemplate(data, data_rp, M, log2N, stream);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
