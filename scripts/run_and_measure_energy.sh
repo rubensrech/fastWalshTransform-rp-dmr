@@ -26,8 +26,8 @@ for ((i=1;i<=NUM_ITERATIONS;i++)); do
         sleep 0.1
     done
 
-    echo "> ITERATION $i => Total energy: $ENERGY mJ" # >> $OUTPUT_FILE
-    echo "" # >> $OUTPUT_FILE
+    echo "> ITERATION $i => Total energy: $ENERGY mJ"
+    echo ""
 
 done
 

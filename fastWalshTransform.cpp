@@ -91,16 +91,10 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Declaring variables
     // * Host data
-    //      - Full-precision
     double *h_Data, *h_Kernel, *h_ResultGPU;
-    //      - Reduced-precision
-    float *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
 
     // * Device data
-    //      - Full-precision
     double *d_Data, *d_Kernel;
-    //      - Reduced-precision
-    float *d_Data_rp, *d_Kernel_rp;
     //      - Extra
     cudaStream_t stream1;
     cudaEvent_t start, stop;
@@ -113,25 +107,16 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Allocating CPU memory
 
-    // Full-precision
     h_Kernel    = (double*)malloc(KERNEL_SIZE);
     h_Data      = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
-    // Reduced-precision
-    h_Kernel_rp    = (float*)malloc(KERNEL_SIZE_RP);
-    h_Data_rp      = (float*)malloc(DATA_SIZE_RP);
-    h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
 
     // ====================================================
     // > Allocating GPU memory
 
     CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&stream1, cudaStreamNonBlocking));
-    // Full-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel, DATA_SIZE));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data,   DATA_SIZE));
-    // Reduced-precision
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel_rp, DATA_SIZE_RP));
-    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data_rp,   DATA_SIZE_RP));
 
     // ====================================================
     // > Generating/Loading input data
@@ -166,23 +151,13 @@ for (i = 0; i < iterations; i++) {
     cudaStreamSynchronize(stream1);
 
     // ====================================================
-    // > Duplicating input
-
-    duplicate_input_gpu(d_Kernel, d_Kernel_rp, kernelN);
-    duplicate_input_gpu(d_Data, d_Data_rp, dataN);
-
-    // ====================================================
     // > Running Fast Walsh Transform on device
     
     // Full-precision / Reduced-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
     fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
     modulateGPU(d_Data, d_Kernel, dataN, stream1);
-    modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);    
     
     // ====================================================
     // > Reading back device results
@@ -191,11 +166,6 @@ for (i = 0; i < iterations; i++) {
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
     cudaStreamSynchronize(stream1);
     
-    // ====================================================
-    // > Checking for faults
-
-    check_errors_gpu(d_Data, d_Data_rp, dataN);
-
     if (measureTime) {
         float totalTimeMs;
         cudaEventRecord(stop, 0);
@@ -203,27 +173,15 @@ for (i = 0; i < iterations; i++) {
         cudaEventElapsedTime(&totalTimeMs, start, stop);
         printf("%s* Total CUDA event time: %f ms (it: %d)%s\n", GREEN, totalTimeMs, i, DFT_COLOR);
     }
-
-    unsigned long long dmrErrors = get_dmr_error();
-    bool faultDetected = dmrErrors > 0;
-    // printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
-
 }
 
     // ====================================================
     // > Shutting down
-    // Full-precision
     free(h_ResultGPU);
     free(h_Data);
     free(h_Kernel);
     CHECK_CUDA_ERROR(cudaFree(d_Data));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel));
-    // Reduced-precision
-    free(h_ResultGPU_rp);
-    free(h_Data_rp);
-    free(h_Kernel_rp);
-    CHECK_CUDA_ERROR(cudaFree(d_Data_rp));
-    CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
 
     if (measureTime) {
         getTimeNow(&t1);
