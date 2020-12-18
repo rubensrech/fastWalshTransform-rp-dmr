@@ -1,0 +1,39 @@
+* Total CUDA event time: 3653.000244 ms 
+* Total execution time: 3880.618 ms (20 iterations)
+> ITERATION 1 => Total energy: 18988.4 mJ
+
+* Total CUDA event time: 3617.894287 ms 
+* Total execution time: 3757.302 ms (20 iterations)
+> ITERATION 2 => Total energy: 19739.7 mJ
+
+* Total CUDA event time: 3642.406006 ms 
+* Total execution time: 3802.265 ms (20 iterations)
+> ITERATION 3 => Total energy: 20725.6 mJ
+
+* Total CUDA event time: 3634.517090 ms 
+* Total execution time: 3779.713 ms (20 iterations)
+> ITERATION 4 => Total energy: 19616.9 mJ
+
+* Total CUDA event time: 3625.242676 ms 
+* Total execution time: 3840.320 ms (20 iterations)
+> ITERATION 5 => Total energy: 20479.5 mJ
+
+* Total CUDA event time: 3630.653320 ms 
+* Total execution time: 3777.281 ms (20 iterations)
+> ITERATION 6 => Total energy: 19755.0 mJ
+
+* Total CUDA event time: 3620.358154 ms 
+* Total execution time: 3829.535 ms (20 iterations)
+> ITERATION 7 => Total energy: 20726.4 mJ
+
+* Total CUDA event time: 3626.455078 ms 
+* Total execution time: 3780.602 ms (20 iterations)
+> ITERATION 8 => Total energy: 20465.2 mJ
+
+* Total CUDA event time: 3627.285400 ms 
+* Total execution time: 3765.325 ms (20 iterations)
+> ITERATION 9 => Total energy: 19355.2 mJ
+
+* Total CUDA event time: 3611.983887 ms 
+* Total execution time: 3783.996 ms (20 iterations)
+> ITERATION 10 => Total energy: 20910.7 mJ
