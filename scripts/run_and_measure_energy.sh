@@ -15,7 +15,7 @@ OUTPUT_FILE="results/$NUM_ITERATIONS--$DATE.txt"
 for ((i=1;i<=NUM_ITERATIONS;i++)); do
 
     # Execute in background
-    ./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1 >> $OUTPUT_FILE 2>> /dev/null &
+    ./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1 -it 20 2>> /dev/null &
     PID=$!
 
     # Calculate energy consumption
@@ -26,10 +26,8 @@ for ((i=1;i<=NUM_ITERATIONS;i++)); do
         sleep 0.1
     done
 
-    echo "> ITERATION $i => Total energy: $ENERGY mJ" >> $OUTPUT_FILE
-    echo -e "\n\n" >> $OUTPUT_FILE
-
-    echo "> ITERATION $i => Total energy: $ENERGY mJ"
+    echo "> ITERATION $i => Total energy: $ENERGY mJ" # >> $OUTPUT_FILE
+    echo "" # >> $OUTPUT_FILE
 
 done
 

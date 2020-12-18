@@ -83,12 +83,10 @@ int main(int argc, char *argv[]) {
     // * Load Input
     char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
     bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
-    // * Save output
-    bool saveOutput = find_int_arg(argc, argv, (char*)"-saveOutput", 0);
-    // * Validate output
-    bool validateOutput = find_int_arg(argc, argv, (char*)"-validateOutput", 0);
     // * Measure time
     bool measureTime = find_int_arg(argc, argv, (char*)"-measureTime", 0);
+    // * Iterations
+    int iterations = find_int_arg(argc, argv, (char*)"-it", 10);
 
     // ====================================================
     // > Declaring variables
@@ -148,6 +146,9 @@ int main(int argc, char *argv[]) {
         for (i = 0; i < dataN; i++) h_Data[i] = (double)rand() / (double)RAND_MAX;
     }
 
+
+for (i = 0; i < iterations; i++) {
+
     // ====================================================
     // > Copying data to device
 
@@ -164,117 +165,50 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
     cudaStreamSynchronize(stream1);
 
-    if (measureTime) {
-        cudaEventRecord(stop, 0);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&memCpyToDeviceTimeMs, start, stop);
-        printf("%s* MemCpy to device time: %f ms%s\n", GREEN, memCpyToDeviceTimeMs, DFT_COLOR);
-    }
-
-    cudaDeviceSynchronize();
-
     // ====================================================
     // > Duplicating input
-
-    float inputDuplicationTimeMs;
-    if (measureTime) {
-        cudaEventRecord(start, 0);
-    }
 
     duplicate_input_gpu(d_Kernel, d_Kernel_rp, kernelN);
     duplicate_input_gpu(d_Data, d_Data_rp, dataN);
 
-    if (measureTime) {
-        cudaEventRecord(stop, 0);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&inputDuplicationTimeMs, start, stop);
-        printf("%s* Input duplication time: %f ms%s\n", GREEN, inputDuplicationTimeMs, DFT_COLOR);
-    }
-
     // ====================================================
     // > Running Fast Walsh Transform on device
-
-    float kernelsTimeMs;
-    if (measureTime) {
-        cudaEventRecord(start, 0);
-    }
     
-    // Full-precision
+    // Full-precision / Reduced-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
+    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
     fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
-    modulateGPU(d_Data, d_Kernel, dataN, stream1);
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    // Reduced-precision
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
     fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
+    modulateGPU(d_Data, d_Kernel, dataN, stream1);
     modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
-
-    if (measureTime) {
-        cudaEventRecord(stop, 0);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&kernelsTimeMs, start, stop);
-        printf("%s* Kernels time: %f ms%s\n", GREEN, kernelsTimeMs, DFT_COLOR);
-    }
+    fwtBatchGPU(d_Data, 1, log2Data, stream1);
+    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);    
     
     // ====================================================
     // > Reading back device results
 
-    float memCpyToHostTimeMs;
-    if (measureTime) {
-        cudaEventRecord(start, 0);
-    }
-
     // Full-precision
     cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
     cudaStreamSynchronize(stream1);
-
-    if (measureTime) {
-        cudaEventRecord(stop, 0);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&memCpyToHostTimeMs, start, stop);
-        printf("%s* MemCpy to host time: %f ms%s\n", GREEN, memCpyToHostTimeMs, DFT_COLOR);
-    }
-
-    // ====================================================
-    // > Validating output
-    if (validateOutput) {
-        validateGPUOutput(h_Data, h_Kernel, log2Data, log2Kernel, h_ResultGPU);
-    }
-
-    // ====================================================
-    // > Saving output
-    if (saveOutput) {
-        if (save_output(h_ResultGPU, dataN)) {
-            printf("OUTPUT SAVED SUCCESSFULY\n");
-        } else {
-            fprintf(stderr, "ERROR: could not save output\n");
-        }
-    }
     
     // ====================================================
     // > Checking for faults
 
-    float checkFaultsTimeMs;
-    if (measureTime) {
-        cudaEventRecord(start, 0);
-    }
-
     check_errors_gpu(d_Data, d_Data_rp, dataN);
 
     if (measureTime) {
+        float totalTimeMs;
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&checkFaultsTimeMs, start, stop);
-        printf("%s* Check faults time: %f ms%s\n", GREEN, checkFaultsTimeMs, DFT_COLOR);
-
-        float dmrTotalTimeMs = memCpyToDeviceTimeMs + inputDuplicationTimeMs + kernelsTimeMs + memCpyToHostTimeMs + checkFaultsTimeMs;
-        printf("%s* Total DMR time: %f ms%s\n", GREEN, dmrTotalTimeMs, DFT_COLOR);
+        cudaEventElapsedTime(&totalTimeMs, start, stop);
+        printf("%s* Total CUDA event time: %f ms (it: %d)%s\n", GREEN, totalTimeMs, i, DFT_COLOR);
     }
 
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
-    printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
+    // printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
+
+}
 
     // ====================================================
     // > Shutting down
@@ -293,11 +227,7 @@ int main(int argc, char *argv[]) {
 
     if (measureTime) {
         getTimeNow(&t1);
-        printf("%s* Total execution time: %.3lf ms%s\n", GREEN, elapsedTime(t0, t1), DFT_COLOR);
-    }
-
-    if (faultDetected) {
-        exit(2);
+        printf("%s* Total execution time: %.3lf ms (%d iterations)%s\n", GREEN, elapsedTime(t0, t1), iterations, DFT_COLOR);
     }
 
     return 0;

@@ -79,7 +79,7 @@ copy_xavier:
 	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ nvidia@192.168.193.16:rubens/fastWalshTransform-dmr
 	
 test:
-	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1
+	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1 -it 10
 
 golden:
 	./fastWalshTransform -input inputs/input-bit-21.data > golden_stdout.txt 2> golden_stderr.txt
