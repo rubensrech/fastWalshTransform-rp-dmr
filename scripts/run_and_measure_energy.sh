@@ -9,9 +9,6 @@ NUM_ITERATIONS=$1
 
 cd ../
 
-DATE=$(TZ="Europe/Berlin" date +"%d.%m.%Y-%H.%M")
-OUTPUT_FILE="results/$NUM_ITERATIONS--$DATE.txt"
-
 for ((i=1;i<=NUM_ITERATIONS;i++)); do
 
     # Execute in background
