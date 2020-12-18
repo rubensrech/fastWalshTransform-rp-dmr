@@ -76,7 +76,7 @@ copy_p100:
 	rsync -av -e ssh --exclude='.git' ./ gppd:fastWalshTransform-dmr
 
 copy_xavier:
-	rsync -av -e ssh --exclude='.git' ./ nvidia@192.168.193.16:rubens/fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ nvidia@192.168.193.16:rubens/fastWalshTransform-dmr
 	
 test:
 	./fastWalshTransform -input inputs/input-bit-21.data -measureTime 1
