@@ -1,0 +1,71 @@
+> DMR: NO-DMR
+* MemCpy to device: 19.605503 ms 
+* Kernels time: 1748.375366 ms 
+* MemCpy to host: 30.615423 ms 
+* Total execution time: 1923.339 ms (20 iterations)
+> ITERATION 1 => Total energy: 10190.2 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 19.824640 ms 
+* Kernels time: 1751.040771 ms 
+* MemCpy to host: 28.606752 ms 
+* Total execution time: 1922.573 ms (20 iterations)
+> ITERATION 2 => Total energy: 11017.6 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 19.783680 ms 
+* Kernels time: 1746.453125 ms 
+* MemCpy to host: 28.008801 ms 
+* Total execution time: 1953.466 ms (20 iterations)
+> ITERATION 3 => Total energy: 12140.0 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 20.281343 ms 
+* Kernels time: 1753.083618 ms 
+* MemCpy to host: 27.001856 ms 
+* Total execution time: 1926.616 ms (20 iterations)
+> ITERATION 4 => Total energy: 10956.1 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 20.891647 ms 
+* Kernels time: 1743.888794 ms 
+* MemCpy to host: 27.112448 ms 
+* Total execution time: 1951.036 ms (20 iterations)
+> ITERATION 5 => Total energy: 12125.2 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 16.588768 ms 
+* Kernels time: 1752.066284 ms 
+* MemCpy to host: 28.315647 ms 
+* Total execution time: 1916.745 ms (20 iterations)
+> ITERATION 6 => Total energy: 11032.3 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 20.233215 ms 
+* Kernels time: 1749.172729 ms 
+* MemCpy to host: 28.802431 ms 
+* Total execution time: 1922.075 ms (20 iterations)
+> ITERATION 7 => Total energy: 11508.3 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 19.657728 ms 
+* Kernels time: 1746.929688 ms 
+* MemCpy to host: 28.427967 ms 
+* Total execution time: 1922.117 ms (20 iterations)
+> ITERATION 8 => Total energy: 11492.2 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 20.237312 ms 
+* Kernels time: 1745.949219 ms 
+* MemCpy to host: 28.342272 ms 
+* Total execution time: 1926.606 ms (20 iterations)
+> ITERATION 9 => Total energy: 11462.3 mJ
+
+> DMR: NO-DMR
+* MemCpy to device: 19.734528 ms 
+* Kernels time: 1747.691895 ms 
+* MemCpy to host: 27.297792 ms 
+* Total execution time: 1948.818 ms (20 iterations)
+> ITERATION 10 => Total energy: 12140.6 mJ
+
+

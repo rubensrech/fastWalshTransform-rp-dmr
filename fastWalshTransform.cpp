@@ -58,9 +58,12 @@ const int dataN = 1 << log2Data;
 const int kernelN = 1 << log2Kernel;
 
 const int DATA_SIZE = dataN   * sizeof(double);
-const int DATA_SIZE_RP = dataN   * sizeof(float);
 const int KERNEL_SIZE = kernelN * sizeof(double);
-const int KERNEL_SIZE_RP = kernelN * sizeof(float);
+
+#if DMR_TYPE != NO_DMR
+    const int DATA_SIZE_RP = dataN   * sizeof(dmr_t);
+    const int KERNEL_SIZE_RP = kernelN * sizeof(dmr_t);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // GPU FWT
@@ -68,11 +71,13 @@ const int KERNEL_SIZE_RP = kernelN * sizeof(float);
 #include "calc_error.h"
 
 extern void fwtBatchGPU(double *d_Data, int M, int log2N, cudaStream_t stream);
-extern void fwtBatchGPU(float *d_Data, int M, int log2N, cudaStream_t stream);
 extern void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream);
-extern void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream);
 
-extern void duplicate_input_gpu(double *input, float *input_rp, int N);
+#if DMR_TYPE != NO_DMR
+    extern void fwtBatchGPU(dmr_t *d_Data, int M, int log2N, cudaStream_t stream);
+    extern void modulateGPU(dmr_t *d_A, dmr_t *d_B, int N, cudaStream_t stream);
+    extern void duplicate_input_gpu(double *input, dmr_t *input_rp, int N);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
@@ -81,26 +86,31 @@ int main(int argc, char *argv[]) {
     // ====================================================
     // > Managing arguments
     // * Load Input
-    char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"none");
-    bool loadInput = (strcmp(input_filename, (char*)"none")==0) ? false : true;
+    char *input_filename = find_char_arg(argc, argv, (char*)"-input", (char*)"inputs/input-bit-21.data");
+    bool loadInput = true;
     // * Measure time
     bool measureTime = find_int_arg(argc, argv, (char*)"-measureTime", 0);
     // * Iterations
-    int iterations = find_int_arg(argc, argv, (char*)"-it", 10);
+    int iterations = find_int_arg(argc, argv, (char*)"-it", 50);
+
+#if DMR_TYPE == NO_DMR
+    printf("> DMR: NO-DMR\n");
+#elif DMR_TYPE == DMR_FLOAT
+    printf("> DMR: Float\n");
+#elif DMR_TYPE == DMR_DOUBLE
+    printf("> DMR: Double\n");
+#endif
 
     // ====================================================
     // > Declaring variables
-    // * Host data
-    //      - Full-precision
     double *h_Data, *h_Kernel, *h_ResultGPU;
-    //      - Reduced-precision
-    float *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
-
-    // * Device data
-    //      - Full-precision
     double *d_Data, *d_Kernel;
-    //      - Reduced-precision
-    float *d_Data_rp, *d_Kernel_rp;
+
+#if DMR_TYPE != NO_DMR
+    dmr_t *h_Data_rp, *h_Kernel_rp, *h_ResultGPU_rp;
+    dmr_t *d_Data_rp, *d_Kernel_rp;
+#endif
+
     //      - Extra
     cudaStream_t stream1;
     cudaEvent_t start, stop;
@@ -112,26 +122,27 @@ int main(int argc, char *argv[]) {
 
     // ====================================================
     // > Allocating CPU memory
-
-    // Full-precision
     h_Kernel    = (double*)malloc(KERNEL_SIZE);
     h_Data      = (double*)malloc(DATA_SIZE);
     h_ResultGPU = (double*)malloc(DATA_SIZE);
-    // Reduced-precision
-    h_Kernel_rp    = (float*)malloc(KERNEL_SIZE_RP);
-    h_Data_rp      = (float*)malloc(DATA_SIZE_RP);
-    h_ResultGPU_rp = (float*)malloc(DATA_SIZE_RP);
+
+#if DMR_TYPE != NO_DMR
+    h_Kernel_rp    = (dmr_t*)malloc(KERNEL_SIZE_RP);
+    h_Data_rp      = (dmr_t*)malloc(DATA_SIZE_RP);
+    h_ResultGPU_rp = (dmr_t*)malloc(DATA_SIZE_RP);
+#endif
 
     // ====================================================
     // > Allocating GPU memory
 
     CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&stream1, cudaStreamNonBlocking));
-    // Full-precision
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel, DATA_SIZE));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data,   DATA_SIZE));
-    // Reduced-precision
+
+#if DMR_TYPE != NO_DMR
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Kernel_rp, DATA_SIZE_RP));
     CHECK_CUDA_ERROR(cudaMalloc((void**)&d_Data_rp,   DATA_SIZE_RP));
+#endif
 
     // ====================================================
     // > Generating/Loading input data
@@ -148,7 +159,6 @@ int main(int argc, char *argv[]) {
 
     // ====================================================
     // > Copying data to device
-
     float memCpyToDeviceTimeMs;
     if (measureTime) {
         cudaEventCreate(&start);
@@ -162,65 +172,129 @@ int main(int argc, char *argv[]) {
     CHECK_CUDA_ERROR(cudaMemcpyAsync(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice, stream1));
     cudaStreamSynchronize(stream1);
 
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&memCpyToDeviceTimeMs, start, stop);
+        printf("%s* MemCpy to device: %f ms %s\n", GREEN, memCpyToDeviceTimeMs, DFT_COLOR);
+    }
+
+#if DMR_TYPE != NO_DMR
+    float dupInputTimeMs;
+    if (measureTime) {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+    }
+
     // ====================================================
     // > Duplicating input
-
     duplicate_input_gpu(d_Kernel, d_Kernel_rp, kernelN);
     duplicate_input_gpu(d_Data, d_Data_rp, dataN);
 
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&dupInputTimeMs, start, stop);
+        printf("%s* Input duplication: %f ms %s\n", GREEN, dupInputTimeMs, DFT_COLOR);
+    }
+#endif
+
     // ====================================================
     // > Running Fast Walsh Transform on device
-    
-for (i = 0; i < iterations; i++) {
-    // Full-precision / Reduced-precision
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
-    fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
-    modulateGPU(d_Data, d_Kernel, dataN, stream1);
-    modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
-    fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);    
-}
-    
-    // ====================================================
-    // > Reading back device results
 
-    // Full-precision
-    cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
-    cudaStreamSynchronize(stream1);
+    float kernelsTimeMs;
+    if (measureTime) {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+    }
     
+    for (i = 0; i < iterations; i++) {
+        fwtBatchGPU(d_Data, 1, log2Data, stream1);
+        fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
+        modulateGPU(d_Data, d_Kernel, dataN, stream1);
+        fwtBatchGPU(d_Data, 1, log2Data, stream1);
+
+#if DMR_TYPE != NO_DMR
+        fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);
+        fwtBatchGPU(d_Kernel_rp, 1, log2Data, stream1);
+        modulateGPU(d_Data_rp, d_Kernel_rp, dataN, stream1);
+        fwtBatchGPU(d_Data_rp, 1, log2Data, stream1);  
+#endif  
+    }
+    
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&kernelsTimeMs, start, stop);
+        printf("%s* Kernels time: %f ms %s\n", GREEN, kernelsTimeMs, DFT_COLOR);
+    }
+
+
+#if DMR_TYPE != NO_DMR
     // ====================================================
     // > Checking for faults
+
+    float checkFaultsTimeMs;
+    if (measureTime) {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+    }
 
     check_errors_gpu(d_Data, d_Data_rp, dataN);
 
     if (measureTime) {
-        float totalTimeMs;
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&totalTimeMs, start, stop);
-        printf("%s* Total CUDA event time: %f ms %s\n", GREEN, totalTimeMs, DFT_COLOR);
+        cudaEventElapsedTime(&checkFaultsTimeMs, start, stop);
+        printf("%s* Check faults: %f ms %s\n", GREEN, checkFaultsTimeMs, DFT_COLOR);
+    }
+#endif  
+
+    // ====================================================
+    // > Reading back device results
+
+    float memCpyToHostTimeMs;
+    if (measureTime) {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
     }
 
+    cudaMemcpyAsync(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost, stream1);
+    cudaStreamSynchronize(stream1);
+
+    if (measureTime) {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&memCpyToHostTimeMs, start, stop);
+        printf("%s* MemCpy to host: %f ms %s\n", GREEN, memCpyToHostTimeMs, DFT_COLOR);
+    }
+
+#if DMR_TYPE != NO_DMR
     unsigned long long dmrErrors = get_dmr_error();
     bool faultDetected = dmrErrors > 0;
     // printf("> Faults detected?  %s (DMR errors: %llu)\n", faultDetected ? "YES" : "NO", dmrErrors);
+#endif
 
     // ====================================================
     // > Shutting down
-    // Full-precision
     free(h_ResultGPU);
     free(h_Data);
     free(h_Kernel);
     CHECK_CUDA_ERROR(cudaFree(d_Data));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel));
+
+#if DMR_TYPE != NO_DMR
     // Reduced-precision
     free(h_ResultGPU_rp);
     free(h_Data_rp);
     free(h_Kernel_rp);
     CHECK_CUDA_ERROR(cudaFree(d_Data_rp));
     CHECK_CUDA_ERROR(cudaFree(d_Kernel_rp));
+#endif
 
     if (measureTime) {
         getTimeNow(&t1);

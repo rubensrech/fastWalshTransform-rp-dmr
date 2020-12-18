@@ -1,0 +1,69 @@
+> DMR: NO-DMR
+* MemCpy to device: 15.162656 ms 
+* Kernels time: 1307.368652 ms 
+* MemCpy to host: 46.869858 ms 
+* Total execution time: 1667.711 ms (100 iterations)
+
+> DMR: NO-DMR
+* MemCpy to device: 15.460160 ms 
+* Kernels time: 1308.077881 ms 
+* MemCpy to host: 47.045406 ms 
+* Total execution time: 1670.274 ms (100 iterations)
+
+> DMR: NO-DMR
+* MemCpy to device: 15.792928 ms 
+* Kernels time: 1308.003784 ms 
+* MemCpy to host: 46.922081 ms 
+* Total execution time: 1666.341 ms (100 iterations)
+
+
+
+> DMR: Float
+* MemCpy to device: 15.854144 ms 
+* Input duplication: 0.915808 ms 
+* Kernels time: 1993.512207 ms 
+* Check faults: 11.846560 ms 
+* MemCpy to host: 47.058495 ms 
+* Total execution time: 2369.143 ms (100 iterations)
+
+> DMR: Float
+* MemCpy to device: 15.394464 ms 
+* Input duplication: 0.830688 ms 
+* Kernels time: 1993.314819 ms 
+* Check faults: 11.838624 ms 
+* MemCpy to host: 46.934238 ms 
+* Total execution time: 2366.935 ms (100 iterations)
+
+> DMR: Float
+* MemCpy to device: 15.114784 ms 
+* Input duplication: 0.916064 ms 
+* Kernels time: 1993.048706 ms 
+* Check faults: 11.855840 ms 
+* MemCpy to host: 46.897282 ms 
+* Total execution time: 2364.385 ms (100 iterations)
+
+
+
+> DMR: Double
+* MemCpy to device: 15.938144 ms 
+* Input duplication: 0.914976 ms 
+* Kernels time: 2615.254150 ms 
+* Check faults: 11.895680 ms 
+* MemCpy to host: 46.897823 ms 
+* Total execution time: 2991.100 ms (100 iterations)
+
+> DMR: Double
+* MemCpy to device: 15.477600 ms 
+* Input duplication: 0.915328 ms 
+* Kernels time: 2615.097656 ms 
+* Check faults: 11.879168 ms 
+* MemCpy to host: 46.973248 ms 
+* Total execution time: 2993.987 ms (100 iterations)
+
+> DMR: Double
+* MemCpy to device: 15.724864 ms 
+* Input duplication: 0.836512 ms 
+* Kernels time: 2615.332764 ms 
+* Check faults: 11.877760 ms 
+* MemCpy to host: 46.969025 ms 
+* Total execution time: 2990.057 ms (100 iterations)

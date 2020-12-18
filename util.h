@@ -23,6 +23,16 @@
 #define WHITE       "\e[0;37m"
 #define DFT_COLOR   "\e[0m"
 
+#define DMR_DOUBLE  64
+#define DMR_FLOAT   32
+#define NO_DMR      0
+
+#if DMR_TYPE == DMR_FLOAT
+    typedef float dmr_t;
+#elif DMR_TYPE == DMR_DOUBLE
+    typedef double dmr_t;
+#endif
+
 #define BLOCK_SIZE 32
 
 #define CHECK_CUDA_ERROR(ans) { checkCudaError((ans), __FILE__, __LINE__); }

@@ -1,6 +1,7 @@
 # ERROR_METRIC = uint_error | relative_error | hybrid
 ERROR_METRIC=uint_error
 FIND_THRESHOLD=0
+DMR_TYPE=0
 
 TARGET=fastWalshTransform
 SRC_DIR=.
@@ -48,6 +49,9 @@ CXXFLAGS+= -DFIND_THRESHOLD
 NVCCFLAGS+= -DFIND_THRESHOLD
 endif
 
+CXXFLAGS+= -DDMR_TYPE=$(DMR_TYPE)
+NVCCFLAGS+= -DDMR_TYPE=$(DMR_TYPE)
+
 all: mkdirobj $(TARGET)
 
 mkdirobj:
@@ -67,13 +71,13 @@ clean:
 	rm $(TARGET)
 
 copy_titanV:
-	rsync -av -e ssh --exclude='.git' ./ gpu_carol_titanV211:fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ gpu_carol_titanV211:fastWalshTransform-dmr
 
 copy_nvbitfi_titanV:
-	rsync -av -e ssh --exclude='.git' ./ gpu_carol_titanV211:nvbitfi/test-apps/fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ gpu_carol_titanV211:nvbitfi/test-apps/fastWalshTransform-dmr
 
 copy_p100:
-	rsync -av -e ssh --exclude='.git' ./ gppd:fastWalshTransform-dmr
+	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ gppd:fastWalshTransform-dmr
 
 copy_xavier:
 	rsync -av -e ssh --exclude='.git' --exclude 'input*.data' ./ nvidia@192.168.193.16:rubens/fastWalshTransform-dmr

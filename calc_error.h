@@ -20,7 +20,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 unsigned long long get_dmr_error();
-void check_errors_gpu(double *array, float *array_rp, int N);
+
+#if DMR_TYPE != NO_DMR
+    void check_errors_gpu(double *array, dmr_t *array_rp, int N);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Find max error functions

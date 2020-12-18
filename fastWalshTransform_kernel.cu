@@ -230,25 +230,32 @@ void modulateGPU(double *d_A, double *d_B, int N, cudaStream_t stream) {
     modulateKernel<<<128, 256, 0, stream>>>(d_A, d_B, N);
 }
 
-void modulateGPU(float *d_A, float *d_B, int N, cudaStream_t stream) {
+#if DMR_TYPE == DMR_FLOAT
+void modulateGPU(dmr_t *d_A, dmr_t *d_B, int N, cudaStream_t stream) {
     modulateKernel<<<128, 256, 0, stream>>>(d_A, d_B, N);
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Duplicate input
 ////////////////////////////////////////////////////////////////////////////////
 
-__global__ void duplicate_input_kernel(double *input, float *input_rp, int N) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < N) {
-        input_rp[i] = input[i];
-    }
-}
+#if DMR_TYPE != NO_DMR
 
-void duplicate_input_gpu(double *input, float *input_rp, int N) {
-    int gridDim = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    duplicate_input_kernel<<<gridDim, BLOCK_SIZE>>>(input, input_rp, N);
-    CHECK_CUDA_ERROR(cudaPeekAtLastError());
-}
+    template<typename dmr_t>
+    __global__ void duplicate_input_kernel(double *input, dmr_t *input_rp, int N) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < N) {
+            input_rp[i] = input[i];
+        }
+    }
+
+    void duplicate_input_gpu(double *input, dmr_t *input_rp, int N) {
+        int gridDim = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        duplicate_input_kernel<dmr_t><<<gridDim, BLOCK_SIZE>>>(input, input_rp, N);
+        CHECK_CUDA_ERROR(cudaPeekAtLastError());
+    }
+
+#endif
 
 #endif

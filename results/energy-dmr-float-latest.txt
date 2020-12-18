@@ -1,0 +1,92 @@
+> DMR: Float
+* MemCpy to device: 20.334593 ms 
+* Input duplication: 5.183680 ms 
+* Kernels time: 2438.161377 ms 
+* Check faults: 15.877760 ms 
+* MemCpy to host: 28.152832 ms 
+* Total execution time: 2784.233 ms (20 iterations)
+> ITERATION 1 => Total energy: 15573.3 mJ
+
+> DMR: Float
+* MemCpy to device: 21.134336 ms 
+* Input duplication: 4.774912 ms 
+* Kernels time: 2441.050537 ms 
+* Check faults: 15.543904 ms 
+* MemCpy to host: 28.312000 ms 
+* Total execution time: 2654.648 ms (20 iterations)
+> ITERATION 2 => Total energy: 17385.4 mJ
+
+> DMR: Float
+* MemCpy to device: 19.097601 ms 
+* Input duplication: 4.414752 ms 
+* Kernels time: 2440.541260 ms 
+* Check faults: 15.849536 ms 
+* MemCpy to host: 28.155584 ms 
+* Total execution time: 2642.388 ms (20 iterations)
+> ITERATION 3 => Total energy: 17139.6 mJ
+
+> DMR: Float
+* MemCpy to device: 20.296703 ms 
+* Input duplication: 5.437952 ms 
+* Kernels time: 2438.150635 ms 
+* Check faults: 15.392416 ms 
+* MemCpy to host: 27.410433 ms 
+* Total execution time: 2638.942 ms (20 iterations)
+> ITERATION 4 => Total energy: 16261.5 mJ
+
+> DMR: Float
+* MemCpy to device: 19.482624 ms 
+* Input duplication: 4.022592 ms 
+* Kernels time: 2434.422852 ms 
+* Check faults: 15.394816 ms 
+* MemCpy to host: 27.872255 ms 
+* Total execution time: 2630.946 ms (20 iterations)
+> ITERATION 5 => Total energy: 17782.2 mJ
+
+> DMR: Float
+* MemCpy to device: 19.738625 ms 
+* Input duplication: 4.063136 ms 
+* Kernels time: 2441.466553 ms 
+* Check faults: 15.819488 ms 
+* MemCpy to host: 28.899809 ms 
+* Total execution time: 2638.402 ms (20 iterations)
+> ITERATION 6 => Total energy: 16401.5 mJ
+
+> DMR: Float
+* MemCpy to device: 18.864128 ms 
+* Input duplication: 5.434848 ms 
+* Kernels time: 2437.015625 ms 
+* Check faults: 15.789344 ms 
+* MemCpy to host: 29.429760 ms 
+* Total execution time: 2654.121 ms (20 iterations)
+> ITERATION 7 => Total energy: 17798.5 mJ
+
+> DMR: Float
+* MemCpy to device: 19.099648 ms 
+* Input duplication: 3.993248 ms 
+* Kernels time: 2436.535156 ms 
+* Check faults: 15.556128 ms 
+* MemCpy to host: 28.338623 ms 
+* Total execution time: 2635.536 ms (20 iterations)
+> ITERATION 8 => Total energy: 16430.4 mJ
+
+> DMR: Float
+* MemCpy to device: 20.621311 ms 
+* Input duplication: 4.264544 ms 
+* Kernels time: 2437.022217 ms 
+* Check faults: 15.908928 ms 
+* MemCpy to host: 29.987425 ms 
+* Total execution time: 2680.041 ms (20 iterations)
+> ITERATION 9 => Total energy: 17645.5 mJ
+
+> DMR: Float
+* MemCpy to device: 20.193279 ms 
+* Input duplication: 4.030656 ms 
+* Kernels time: 2437.125000 ms 
+* Check faults: 15.554880 ms 
+* MemCpy to host: 28.407072 ms 
+* Total execution time: 2633.705 ms (20 iterations)
+> ITERATION 10 => Total energy: 16554.9 mJ
+
+
+
