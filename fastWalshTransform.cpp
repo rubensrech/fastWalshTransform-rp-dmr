@@ -132,8 +132,6 @@ int main(int argc, char *argv[]) {
     }
 
 
-for (i = 0; i < iterations; i++) {
-
     // ====================================================
     // > Copying data to device
 
@@ -153,12 +151,14 @@ for (i = 0; i < iterations; i++) {
     // ====================================================
     // > Running Fast Walsh Transform on device
     
+for (i = 0; i < iterations; i++) {
     // Full-precision / Reduced-precision
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
     fwtBatchGPU(d_Kernel, 1, log2Data, stream1);
     modulateGPU(d_Data, d_Kernel, dataN, stream1);
     fwtBatchGPU(d_Data, 1, log2Data, stream1);
-    
+}    
+
     // ====================================================
     // > Reading back device results
 
@@ -171,9 +171,8 @@ for (i = 0; i < iterations; i++) {
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&totalTimeMs, start, stop);
-        printf("%s* Total CUDA event time: %f ms (it: %d)%s\n", GREEN, totalTimeMs, i, DFT_COLOR);
+        printf("%s* Total CUDA event time: %f ms%s\n", GREEN, totalTimeMs, DFT_COLOR);
     }
-}
 
     // ====================================================
     // > Shutting down
